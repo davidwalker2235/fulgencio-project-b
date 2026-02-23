@@ -106,6 +106,11 @@ variable "model_name" {
   default     = "gpt-realtime"
 }
 
+variable "firebase_database_url" {
+  description = "URL de Firebase Realtime Database"
+  type        = string
+}
+
 variable "cors_origins" {
   description = "Orígenes permitidos para CORS"
   type        = string

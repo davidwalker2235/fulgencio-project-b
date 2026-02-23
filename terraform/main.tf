@@ -130,6 +130,11 @@ resource "azurerm_container_app" "backend" {
       }
 
       env {
+        name  = "FIREBASE_DATABASE_URL"
+        value = var.firebase_database_url
+      }
+
+      env {
         name  = "CORS_ORIGINS"
         value = var.cors_origins
       }
