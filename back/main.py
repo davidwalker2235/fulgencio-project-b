@@ -28,9 +28,26 @@ cors_origins = os.getenv(
     "http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080"
 ).split(",")
 
+# FastAPI CORSMiddleware no interpreta comodines en allow_origins.
+# Si llega un origen con '*' (p. ej. https://fulgenciob-frontend.*.azurecontainerapps.io),
+# lo convertimos a una regex y lo pasamos por allow_origin_regex.
+normalized_cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+exact_cors_origins: list[str] = []
+cors_regex_parts: list[str] = []
+
+for origin in normalized_cors_origins:
+    if "*" in origin:
+        escaped = re.escape(origin).replace(r"\*", ".*")
+        cors_regex_parts.append(f"^{escaped}$")
+    else:
+        exact_cors_origins.append(origin)
+
+cors_origin_regex = "|".join(cors_regex_parts) if cors_regex_parts else None
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=exact_cors_origins,
+    allow_origin_regex=cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
