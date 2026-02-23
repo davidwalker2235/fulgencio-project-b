@@ -145,11 +145,6 @@ resource "azurerm_container_app" "backend" {
       }
 
       env {
-        name        = "ERNI_AGENT_URL"
-        secret_name = "erni-agent-url"
-      }
-
-      env {
         name  = "MODEL_IMAGE_NAME"
         value = var.model_image_name
       }
@@ -195,11 +190,6 @@ resource "azurerm_container_app" "backend" {
   secret {
     name  = "azure-openai-api-key"
     value = var.azure_openai_api_key
-  }
-
-  secret {
-    name  = "erni-agent-url"
-    value = var.erni_agent_url
   }
 
   tags = var.tags

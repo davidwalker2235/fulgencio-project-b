@@ -125,13 +125,6 @@ variable "voice_agent_type" {
   default     = "erni_agent"
 }
 
-variable "erni_agent_url" {
-  description = "URL del WebSocket de Erni Agent (incluye credenciales)"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
 # Imagen / caricaturas (Azure OpenAI gpt-image-1.5)
 variable "model_image_name" {
   description = "Nombre del modelo de imagen Azure OpenAI"
