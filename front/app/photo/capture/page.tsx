@@ -13,8 +13,8 @@ function resolveBackendHttpBaseUrl(): string {
   if (typeof window !== "undefined") {
     const protocol = window.location.protocol === "https:" ? "https:" : "http:";
     const host = window.location.hostname;
-    if (host.includes("fulgencio-frontend")) {
-      return `${protocol}//${host.replace("fulgencio-frontend", "fulgencio-backend")}`;
+    if (host.includes("fulgencioB-frontend")) {
+      return `${protocol}//${host.replace("fulgencioB-frontend", "fulgencioB-backend")}`;
     }
   }
 

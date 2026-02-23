@@ -1,7 +1,7 @@
 variable "resource_group_name" {
   description = "Nombre del grupo de recursos de Azure"
   type        = string
-  default     = "fulgencio-rg"
+  default     = "fulgencioB-rg"
 }
 
 variable "location" {
@@ -13,13 +13,13 @@ variable "location" {
 variable "project_name" {
   description = "Nombre del proyecto (usado para nombrar recursos)"
   type        = string
-  default     = "fulgencio"
+  default     = "fulgencioB"
 }
 
 variable "acr_name" {
   description = "Nombre del Azure Container Registry (debe ser único globalmente, solo minúsculas y números)"
   type        = string
-  default     = "fulgencioacr"
+  default     = "fulgenciobacr"
 }
 
 variable "tags" {
@@ -27,7 +27,7 @@ variable "tags" {
   type        = map(string)
   default = {
     Environment = "production"
-    Project     = "fulgencio"
+    Project     = "fulgencioB"
   }
 }
 
@@ -109,7 +109,7 @@ variable "model_name" {
 variable "cors_origins" {
   description = "Orígenes permitidos para CORS"
   type        = string
-  default     = "https://fulgencio-frontend.*.azurecontainerapps.io"
+  default     = "https://fulgencioB-frontend.*.azurecontainerapps.io"
 }
 
 # Tags de imagen para forzar nueva revisión en cada deploy (evita reinicio manual)

@@ -47,7 +47,7 @@ az account show --query id --output tsv
 
 ```bash
 # Reemplaza 'tu-subscription-id' con el valor obtenido en el paso anterior
-az ad sp create-for-rbac --name "fulgencio-sp" \
+az ad sp create-for-rbac --name "fulgencioB-sp" \
   --role contributor \
   --scopes /subscriptions/tu-subscription-id \
   --sdk-auth
@@ -57,7 +57,7 @@ az ad sp create-for-rbac --name "fulgencio-sp" \
 
 ```bash
 # Obtener el Object ID del Service Principal
-SP_OBJECT_ID=$(az ad sp list --display-name "fulgencio-sp" --query "[0].id" -o tsv)
+SP_OBJECT_ID=$(az ad sp list --display-name "fulgencioB-sp" --query "[0].id" -o tsv)
 
 # Asignar el rol "User Access Administrator" a nivel de suscripción
 az role assignment create \
@@ -137,7 +137,7 @@ Para la primera vez, crea el Resource Group manualmente:
 
 ```bash
 # Crear Resource Group
-az group create --name fulgencio-rg --location "West Europe"
+az group create --name fulgencioB-rg --location "West Europe"
 ```
 
 **Nota**: El ACR y otros recursos se crearán automáticamente con Terraform. Ya no necesitas crear el ACR manualmente.
@@ -149,25 +149,25 @@ Para almacenar el estado de Terraform en Azure:
 ```bash
 # Crear Storage Account para el estado
 az storage account create \
-  --name tfstatefulgencio \
-  --resource-group fulgencio-rg \
+  --name tfstatefulgenciob \
+  --resource-group fulgencioB-rg \
   --location "West Europe" \
   --sku Standard_LRS
 
 # Crear contenedor
 az storage container create \
   --name tfstate \
-  --account-name tfstatefulgencio
+  --account-name tfstatefulgenciob
 ```
 
 Luego actualiza `terraform/main.tf` en la sección `backend`:
 
 ```hcl
 backend "azurerm" {
-  resource_group_name  = "fulgencio-rg"
-  storage_account_name = "tfstatefulgencio"
+  resource_group_name  = "fulgencioB-rg"
+  storage_account_name = "tfstatefulgenciob"
   container_name       = "tfstate"
-  key                  = "fulgencio.terraform.tfstate"
+  key                  = "fulgencioB.terraform.tfstate"
 }
 ```
 
@@ -181,10 +181,10 @@ cp terraform.tfvars.example terraform.tfvars
 Edita `terraform/terraform.tfvars` y rellena los valores:
 
 ```hcl
-resource_group_name = "fulgencio-rg"
+resource_group_name = "fulgencioB-rg"
 location            = "West Europe"
-project_name        = "fulgencio"
-acr_name            = "fulgencioacr"  # Debe ser único, solo minúsculas y números
+project_name        = "fulgencioB"
+acr_name            = "fulgenciobacr"  # Debe ser único, solo minúsculas y números
 
 azure_openai_endpoint = "https://services-aida-apps-sweden.cognitiveservices.azure.com"
 azure_openai_api_key  = "tu_api_key_aqui"
@@ -268,7 +268,7 @@ Después del primer despliegue, necesitas actualizar el CORS con la URL real del
 2. Actualiza `terraform/terraform.tfvars`:
 
 ```hcl
-cors_origins = "https://fulgencio-frontend-xxxxx.azurecontainerapps.io"
+cors_origins = "https://fulgencioB-frontend-xxxxx.azurecontainerapps.io"
 ```
 
 3. O actualiza directamente en Azure Portal o ejecuta:
@@ -285,21 +285,21 @@ terraform apply -var="cors_origins=https://tu-frontend-url.azurecontainerapps.io
 ```bash
 # Backend
 az containerapp logs show \
-  --name fulgencio-backend \
-  --resource-group fulgencio-rg \
+  --name fulgencioB-backend \
+  --resource-group fulgencioB-rg \
   --follow
 
 # Frontend
 az containerapp logs show \
-  --name fulgencio-frontend \
-  --resource-group fulgencio-rg \
+  --name fulgencioB-frontend \
+  --resource-group fulgencioB-rg \
   --follow
 ```
 
 ### Verificar estado de los recursos
 
 ```bash
-az containerapp list --resource-group fulgencio-rg --output table
+az containerapp list --resource-group fulgencioB-rg --output table
 ```
 
 ### Problemas comunes
@@ -309,15 +309,15 @@ az containerapp list --resource-group fulgencio-rg --output table
 - Cambia `acr_name` en `terraform.tfvars`
 
 #### Error: "Service Principal not found"
-- Verifica que el Service Principal existe: `az ad sp list --display-name "fulgencio-sp"`
+- Verifica que el Service Principal existe: `az ad sp list --display-name "fulgencioB-sp"`
 - Verifica que `AZURE_CREDENTIALS` en GitHub tiene el formato JSON correcto
 
 #### Error: "Image pull failed"
 - Verifica que las credenciales del ACR están correctas en GitHub Secrets
-- Verifica que las imágenes se subieron correctamente: `az acr repository list --name fulgencioacr`
+- Verifica que las imágenes se subieron correctamente: `az acr repository list --name fulgenciobacr`
 
 #### Error: "Container App not accessible"
-- Verifica que el ingress está habilitado: `az containerapp ingress show --name fulgencio-frontend --resource-group fulgencio-rg`
+- Verifica que el ingress está habilitado: `az containerapp ingress show --name fulgencioB-frontend --resource-group fulgencioB-rg`
 - Verifica los logs del contenedor para errores de aplicación
 
 ## 📚 Recursos Adicionales
