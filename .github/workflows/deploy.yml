@@ -1,0 +1,421 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  AZURE_RESOURCE_GROUP: fulgencio-rg
+  AZURE_LOCATION: West Europe
+  ACR_NAME: fulgencioacr
+  BACKEND_IMAGE: backend
+  FRONTEND_IMAGE: frontend
+
+jobs:
+  setup-infrastructure:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set Azure Subscription ID
+        id: set-subscription
+        run: |
+          SUBSCRIPTION_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.subscriptionId')
+          echo "subscription_id=$SUBSCRIPTION_ID" >> $GITHUB_OUTPUT
+          echo "ARM_SUBSCRIPTION_ID=$SUBSCRIPTION_ID" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+        env:
+          ARM_SUBSCRIPTION_ID: ${{ steps.set-subscription.outputs.subscription_id }}
+
+      - name: Import existing resources if needed
+        working-directory: ./terraform
+        run: |
+          # Import Resource Group if it exists
+          if az group show --name ${{ env.AZURE_RESOURCE_GROUP }} --query id -o tsv 2>/dev/null; then
+            if ! terraform state show azurerm_resource_group.main 2>/dev/null; then
+              echo "Resource Group exists but not in state. Importing..."
+              terraform import azurerm_resource_group.main /subscriptions/${{ steps.set-subscription.outputs.subscription_id }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }}
+            else
+              echo "Resource Group already in Terraform state."
+            fi
+          else
+            echo "Resource Group does not exist. Terraform will create it."
+          fi
+          
+          # Import ACR if it exists
+          if az acr show --name ${{ env.ACR_NAME }} --query id -o tsv 2>/dev/null; then
+            if ! terraform state show azurerm_container_registry.main 2>/dev/null; then
+              echo "ACR exists but not in state. Importing..."
+              terraform import azurerm_container_registry.main /subscriptions/${{ steps.set-subscription.outputs.subscription_id }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }}/providers/Microsoft.ContainerRegistry/registries/${{ env.ACR_NAME }}
+            else
+              echo "ACR already in Terraform state."
+            fi
+          else
+            echo "ACR does not exist. Terraform will create it."
+          fi
+        env:
+          ARM_SUBSCRIPTION_ID: ${{ steps.set-subscription.outputs.subscription_id }}
+          TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          TF_VAR_azure_openai_api_version: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          TF_VAR_model_name: ${{ secrets.MODEL_NAME }}
+        continue-on-error: true
+
+      - name: Terraform Plan (ACR and dependencies)
+        working-directory: ./terraform
+        run: terraform plan -target=azurerm_resource_group.main -target=azurerm_container_registry.main -out=tfplan-acr
+        env:
+          ARM_SUBSCRIPTION_ID: ${{ steps.set-subscription.outputs.subscription_id }}
+          TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          TF_VAR_azure_openai_api_version: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          TF_VAR_model_name: ${{ secrets.MODEL_NAME }}
+        continue-on-error: true
+
+      - name: Terraform Apply (ACR and dependencies)
+        working-directory: ./terraform
+        run: |
+          if [ -f tfplan-acr ]; then
+            terraform apply -auto-approve tfplan-acr
+          else
+            terraform apply -target=azurerm_resource_group.main -target=azurerm_container_registry.main -auto-approve
+          fi
+        env:
+          ARM_SUBSCRIPTION_ID: ${{ steps.set-subscription.outputs.subscription_id }}
+          TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          TF_VAR_azure_openai_api_version: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          TF_VAR_model_name: ${{ secrets.MODEL_NAME }}
+
+  build-and-push:
+    needs: setup-infrastructure
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get ACR credentials
+        id: acr-creds
+        run: |
+          ACR_USERNAME=$(az acr credential show --name ${{ env.ACR_NAME }} --query username -o tsv)
+          ACR_PASSWORD=$(az acr credential show --name ${{ env.ACR_NAME }} --query passwords[0].value -o tsv)
+          echo "username=$ACR_USERNAME" >> $GITHUB_OUTPUT
+          echo "password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
+
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_NAME }}.azurecr.io
+          username: ${{ steps.acr-creds.outputs.username }}
+          password: ${{ steps.acr-creds.outputs.password }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./back
+          push: true
+          tags: |
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.ACR_NAME }}.azurecr.io/${{ env.BACKEND_IMAGE }}:latest
+          cache-to: type=inline
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./front
+          push: true
+          tags: |
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.FRONTEND_IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.ACR_NAME }}.azurecr.io/${{ env.FRONTEND_IMAGE }}:latest
+          cache-to: type=inline
+          build-args: |
+            NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+            NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}
+            NEXT_PUBLIC_FIREBASE_DATABASE_URL=${{ secrets.FIREBASE_DATABASE_URL }}
+            NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+            NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}
+            NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+            NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+            NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set Azure Subscription ID
+        id: set-subscription
+        run: |
+          SUBSCRIPTION_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.subscriptionId')
+          echo "subscription_id=$SUBSCRIPTION_ID" >> $GITHUB_OUTPUT
+          echo "ARM_SUBSCRIPTION_ID=$SUBSCRIPTION_ID" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+        env:
+          ARM_SUBSCRIPTION_ID: ${{ steps.set-subscription.outputs.subscription_id }}
+
+      - name: Import existing resources if needed
+        working-directory: ./terraform
+        run: |
+          # Import Resource Group if it exists
+          if az group show --name ${{ env.AZURE_RESOURCE_GROUP }} --query id -o tsv 2>/dev/null; then
+            if ! terraform state show azurerm_resource_group.main 2>/dev/null; then
+              echo "Resource Group exists but not in state. Importing..."
+              terraform import azurerm_resource_group.main /subscriptions/${{ steps.set-subscription.outputs.subscription_id }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }}
+            else
+              echo "Resource Group already in Terraform state."
+            fi
+          else
+            echo "Resource Group does not exist. Terraform will create it."
+          fi
+          
+          # Import ACR if it exists
+          if az acr show --name ${{ env.ACR_NAME }} --query id -o tsv 2>/dev/null; then
+            if ! terraform state show azurerm_container_registry.main 2>/dev/null; then
+              echo "ACR exists but not in state. Importing..."
+              terraform import azurerm_container_registry.main /subscriptions/${{ steps.set-subscription.outputs.subscription_id }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }}/providers/Microsoft.ContainerRegistry/registries/${{ env.ACR_NAME }}
+            else
+              echo "ACR already in Terraform state."
+            fi
+          else
+            echo "ACR does not exist. Terraform will create it."
+          fi
+          
+          # Import Log Analytics Workspace if it exists
+          if az monitor log-analytics workspace show --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --workspace-name fulgencio-logs --query id -o tsv 2>/dev/null; then
+            if ! terraform state show azurerm_log_analytics_workspace.main 2>/dev/null; then
+              echo "Log Analytics Workspace exists but not in state. Importing..."
+              terraform import azurerm_log_analytics_workspace.main /subscriptions/${{ steps.set-subscription.outputs.subscription_id }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }}/providers/Microsoft.OperationalInsights/workspaces/fulgencio-logs
+            else
+              echo "Log Analytics Workspace already in Terraform state."
+            fi
+          else
+            echo "Log Analytics Workspace does not exist. Terraform will create it."
+          fi
+          
+          # Import User Assigned Identity if it exists
+          if az identity show --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name fulgencio-identity --query id -o tsv 2>/dev/null; then
+            if ! terraform state show azurerm_user_assigned_identity.main 2>/dev/null; then
+              echo "User Assigned Identity exists but not in state. Importing..."
+              terraform import azurerm_user_assigned_identity.main /subscriptions/${{ steps.set-subscription.outputs.subscription_id }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/fulgencio-identity
+            else
+              echo "User Assigned Identity already in Terraform state."
+            fi
+          else
+            echo "User Assigned Identity does not exist. Terraform will create it."
+          fi
+          
+          # Import Container App Environment if it exists
+          if az containerapp env show --name fulgencio-env --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query id -o tsv 2>/dev/null; then
+            if ! terraform state show azurerm_container_app_environment.main 2>/dev/null; then
+              echo "Container App Environment exists but not in state. Importing..."
+              terraform import azurerm_container_app_environment.main /subscriptions/${{ steps.set-subscription.outputs.subscription_id }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }}/providers/Microsoft.App/managedEnvironments/fulgencio-env
+            else
+              echo "Container App Environment already in Terraform state."
+            fi
+          else
+            echo "Container App Environment does not exist. Terraform will create it."
+          fi
+          
+          # Check if role assignment already exists and import if needed, or create it manually if Service Principal lacks permissions
+          IDENTITY_PRINCIPAL_ID=$(az identity show --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name fulgencio-identity --query principalId -o tsv 2>/dev/null || echo "")
+          ACR_ID=$(az acr show --name ${{ env.ACR_NAME }} --query id -o tsv 2>/dev/null || echo "")
+          if [ ! -z "$IDENTITY_PRINCIPAL_ID" ] && [ ! -z "$ACR_ID" ]; then
+            ROLE_ASSIGNMENT_ID=$(az role assignment list --scope "$ACR_ID" --assignee "$IDENTITY_PRINCIPAL_ID" --role AcrPull --query "[0].id" -o tsv 2>/dev/null || echo "")
+            if [ ! -z "$ROLE_ASSIGNMENT_ID" ]; then
+              if ! terraform state show azurerm_role_assignment.acr_pull 2>/dev/null; then
+                echo "Role Assignment exists but not in state. Importing..."
+                terraform import azurerm_role_assignment.acr_pull "$ROLE_ASSIGNMENT_ID" || echo "Failed to import role assignment, Terraform will try to create it"
+              else
+                echo "Role Assignment already in Terraform state."
+              fi
+            else
+              echo "Role Assignment does not exist. Attempting to create it manually..."
+              az role assignment create --assignee "$IDENTITY_PRINCIPAL_ID" --role AcrPull --scope "$ACR_ID" 2>/dev/null && echo "✅ Role assignment created successfully" || echo "❌ Warning: Could not create role assignment. This may cause ImagePullBackOff errors. Ensure Service Principal has 'User Access Administrator' permissions."
+            fi
+          else
+            echo "⚠️ Warning: Could not get Identity Principal ID or ACR ID. Role assignment may not work correctly."
+          fi
+          
+          # Verificar que las imágenes existen en el ACR
+          echo "Verifying images exist in ACR..."
+          az acr repository show --name ${{ env.ACR_NAME }} --repository ${{ env.BACKEND_IMAGE }} 2>/dev/null && echo "✅ Backend image exists" || echo "❌ Backend image not found in ACR"
+          az acr repository show --name ${{ env.ACR_NAME }} --repository ${{ env.FRONTEND_IMAGE }} 2>/dev/null && echo "✅ Frontend image exists" || echo "❌ Frontend image not found in ACR"
+          
+          # Import Container App Backend if it exists
+          if az containerapp show --name fulgencio-backend --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query id -o tsv 2>/dev/null; then
+            if ! terraform state show azurerm_container_app.backend 2>/dev/null; then
+              echo "Container App Backend exists but not in state. Importing..."
+              terraform import azurerm_container_app.backend /subscriptions/${{ steps.set-subscription.outputs.subscription_id }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }}/providers/Microsoft.App/containerApps/fulgencio-backend
+            else
+              echo "Container App Backend already in Terraform state."
+            fi
+          else
+            echo "Container App Backend does not exist. Terraform will create it."
+          fi
+          
+          # Import Container App Frontend if it exists
+          if az containerapp show --name fulgencio-frontend --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query id -o tsv 2>/dev/null; then
+            if ! terraform state show azurerm_container_app.frontend 2>/dev/null; then
+              echo "Container App Frontend exists but not in state. Importing..."
+              terraform import azurerm_container_app.frontend /subscriptions/${{ steps.set-subscription.outputs.subscription_id }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }}/providers/Microsoft.App/containerApps/fulgencio-frontend
+            else
+              echo "Container App Frontend already in Terraform state."
+            fi
+          else
+            echo "Container App Frontend does not exist. Terraform will create it."
+          fi
+        env:
+          ARM_SUBSCRIPTION_ID: ${{ steps.set-subscription.outputs.subscription_id }}
+          TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          TF_VAR_azure_openai_api_version: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          TF_VAR_model_name: ${{ secrets.MODEL_NAME }}
+          TF_VAR_backend_image_tag: ${{ github.sha }}
+          TF_VAR_frontend_image_tag: ${{ github.sha }}
+        continue-on-error: true
+
+      - name: Terraform Plan
+        working-directory: ./terraform
+        run: terraform plan -out=tfplan
+        env:
+          ARM_SUBSCRIPTION_ID: ${{ steps.set-subscription.outputs.subscription_id }}
+          TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          TF_VAR_azure_openai_api_version: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          TF_VAR_model_name: ${{ secrets.MODEL_NAME }}
+          TF_VAR_backend_image_tag: ${{ github.sha }}
+          TF_VAR_frontend_image_tag: ${{ github.sha }}
+
+      - name: Ensure Role Assignment exists before deploying
+        run: |
+          # Verificar y crear el role assignment si no existe
+          IDENTITY_PRINCIPAL_ID=$(az identity show --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name fulgencio-identity --query principalId -o tsv)
+          ACR_ID=$(az acr show --name ${{ env.ACR_NAME }} --query id -o tsv)
+          
+          ROLE_ASSIGNMENT_ID=$(az role assignment list --scope "$ACR_ID" --assignee "$IDENTITY_PRINCIPAL_ID" --role AcrPull --query "[0].id" -o tsv || echo "")
+          
+          if [ -z "$ROLE_ASSIGNMENT_ID" ]; then
+            echo "Creating role assignment for ACR authentication..."
+            az role assignment create \
+              --assignee "$IDENTITY_PRINCIPAL_ID" \
+              --role AcrPull \
+              --scope "$ACR_ID" \
+              --output none
+            echo "✅ Role assignment created"
+          else
+            echo "✅ Role assignment already exists"
+          fi
+        env:
+          ARM_SUBSCRIPTION_ID: ${{ steps.set-subscription.outputs.subscription_id }}
+
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: terraform apply -auto-approve tfplan
+        env:
+          ARM_SUBSCRIPTION_ID: ${{ steps.set-subscription.outputs.subscription_id }}
+          TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          TF_VAR_azure_openai_api_version: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          TF_VAR_model_name: ${{ secrets.MODEL_NAME }}
+          TF_VAR_backend_image_tag: ${{ github.sha }}
+          TF_VAR_frontend_image_tag: ${{ github.sha }}
+
+      - name: Configure ACR registry for Container Apps
+        run: |
+          # Obtener credenciales del ACR
+          ACR_USERNAME=$(az acr credential show --name ${{ env.ACR_NAME }} --query username -o tsv)
+          ACR_PASSWORD=$(az acr credential show --name ${{ env.ACR_NAME }} --query passwords[0].value -o tsv)
+          IDENTITY_CLIENT_ID=$(az identity show --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name fulgencio-identity --query clientId -o tsv)
+          
+          # Configurar registry para backend - intentar managed identity primero, luego credenciales
+          echo "Configuring ACR registry for backend..."
+          az containerapp registry set \
+            --name fulgencio-backend \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --server ${{ env.ACR_NAME }}.azurecr.io \
+            --identity $IDENTITY_CLIENT_ID 2>/dev/null || \
+          az containerapp registry set \
+            --name fulgencio-backend \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --server ${{ env.ACR_NAME }}.azurecr.io \
+            --username $ACR_USERNAME \
+            --password $ACR_PASSWORD
+          
+          # Configurar registry para frontend - intentar managed identity primero, luego credenciales
+          echo "Configuring ACR registry for frontend..."
+          az containerapp registry set \
+            --name fulgencio-frontend \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --server ${{ env.ACR_NAME }}.azurecr.io \
+            --identity $IDENTITY_CLIENT_ID 2>/dev/null || \
+          az containerapp registry set \
+            --name fulgencio-frontend \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --server ${{ env.ACR_NAME }}.azurecr.io \
+            --username $ACR_USERNAME \
+            --password $ACR_PASSWORD
+          
+          echo "✅ ACR registry configured for both Container Apps"
+        env:
+          ARM_SUBSCRIPTION_ID: ${{ steps.set-subscription.outputs.subscription_id }}
+
+      - name: Get Frontend URL
+        working-directory: ./terraform
+        run: |
+          FRONTEND_URL=$(terraform output -raw frontend_url)
+          echo "Frontend URL: $FRONTEND_URL"
+          echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_ENV
+
+      - name: Output deployment URLs
+        working-directory: ./terraform
+        run: |
+          echo "## 🚀 Deployment URLs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Frontend:** $(terraform output -raw frontend_url)" >> $GITHUB_STEP_SUMMARY
+          echo "**Backend:** $(terraform output -raw backend_url)" >> $GITHUB_STEP_SUMMARY
+

@@ -1,0 +1,265 @@
+# ===========================================
+# Python (Backend) - Solo en back/
+# ===========================================
+
+# Byte-compiled / optimized / DLL files
+back/__pycache__/
+back/**/*.py[cod]
+back/**/*$py.class
+back/**/*.so
+
+# Distribution / packaging
+back/.Python
+back/build/
+back/develop-eggs/
+back/dist/
+back/downloads/
+back/eggs/
+back/.eggs/
+back/lib/
+back/lib64/
+back/parts/
+back/sdist/
+back/var/
+back/wheels/
+back/pip-wheel-metadata/
+back/share/python-wheels/
+back/**/*.egg-info/
+back/.installed.cfg
+back/**/*.egg
+back/MANIFEST
+
+# PyInstaller
+back/**/*.manifest
+back/**/*.spec
+
+# Installer logs
+back/pip-log.txt
+back/pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+back/htmlcov/
+back/.tox/
+back/.nox/
+back/.coverage
+back/.coverage.*
+back/.cache
+back/nosetests.xml
+back/coverage.xml
+back/**/*.cover
+back/**/*.py,cover
+back/.hypothesis/
+back/.pytest_cache/
+
+# Translations
+back/**/*.mo
+back/**/*.pot
+
+# Django stuff
+back/**/*.log
+back/local_settings.py
+back/db.sqlite3
+back/db.sqlite3-journal
+
+# Flask stuff
+back/instance/
+back/.webassets-cache
+
+# Scrapy stuff
+back/.scrapy
+
+# Sphinx documentation
+back/docs/_build/
+
+# PyBuilder
+back/target/
+
+# Jupyter Notebook
+back/.ipynb_checkpoints
+
+# IPython
+back/profile_default/
+back/ipython_config.py
+
+# pyenv
+back/.python-version
+
+# pipenv
+back/Pipfile.lock
+
+# PEP 582
+back/__pypackages__/
+
+# Celery stuff
+back/celerybeat-schedule
+back/celerybeat.pid
+
+# SageMath parsed files
+back/**/*.sage.py
+
+# Environments
+back/venv/
+back/env/
+back/ENV/
+back/env.bak/
+back/venv.bak/
+back/.venv
+
+# Spyder project settings
+back/.spyderproject
+back/.spyproject
+
+# Rope project settings
+back/.ropeproject
+
+# mkdocs documentation
+back/site
+
+# mypy
+back/.mypy_cache/
+back/.dmypy.json
+back/dmypy.json
+
+# Pyre type checker
+back/.pyre/
+
+# ===========================================
+# Next.js (Frontend) - Solo en front/
+# ===========================================
+
+# Dependencies
+front/node_modules/
+front/.pnp
+front/.pnp.js
+front/.yarn/install-state.gz
+
+# Testing
+front/coverage
+
+# Next.js
+front/.next/
+front/out/
+
+# Production
+front/build
+
+# Debug logs (solo logs de npm/yarn)
+front/npm-debug.log*
+front/yarn-debug.log*
+front/yarn-error.log*
+
+# Local env files
+front/.env
+front/.env*.local
+front/.env.development.local
+front/.env.test.local
+front/.env.production.local
+
+# Vercel
+front/.vercel
+
+# TypeScript cache
+front/**/*.tsbuildinfo
+front/next-env.d.ts
+
+# ===========================================
+# Environment Variables (Ambos proyectos)
+# ===========================================
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ===========================================
+# Terraform
+# ===========================================
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfvars
+terraform/.terraform.lock.hcl
+terraform/crash.log
+terraform/crash.*.log
+
+# ===========================================
+# IDEs y Editores
+# ===========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ===========================================
+# Sistemas Operativos
+# ===========================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===========================================
+# Logs y Archivos Temporales
+# ===========================================
+# Logs de aplicación (no archivos de configuración)
+*.log
+!front/**/*.config.*
+!back/**/*.config.*
+logs/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# ===========================================
+# Archivos de Configuración Sensibles
+# ===========================================
+*.key
+*.pem
+*.cert
+secrets/
+.secrets
+
