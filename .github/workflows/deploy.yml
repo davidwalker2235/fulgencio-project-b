@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_RESOURCE_GROUP: fulgencioB-rg
+  AZURE_RESOURCE_GROUP: fulgenciob-rg
   AZURE_LOCATION: West Europe
   ACR_NAME: fulgenciobacr
   BACKEND_IMAGE: backend

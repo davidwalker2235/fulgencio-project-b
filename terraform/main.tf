@@ -1,7 +1,7 @@
 # Backend configurado opcionalmente - descomenta y configura después de crear el Storage Account
 # terraform {
 #   backend "azurerm" {
-#     resource_group_name  = "fulgencioB-rg"
+#     resource_group_name  = "fulgenciob-rg"
 #     storage_account_name = "tfstatefulgenciob"
 #     container_name       = "tfstate"
 #     key                  = "fulgencioB.terraform.tfstate"

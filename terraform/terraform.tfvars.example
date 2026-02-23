@@ -1,7 +1,7 @@
 # Copia este archivo a terraform.tfvars y rellena los valores
 # terraform.tfvars está en .gitignore y no se subirá al repositorio
 
-resource_group_name = "fulgencioB-rg"
+resource_group_name = "fulgenciob-rg"
 location            = "West Europe"
 project_name        = "fulgenciob"
 acr_name            = "fulgenciobacr"  # Debe ser único globalmente, solo minúsculas y números

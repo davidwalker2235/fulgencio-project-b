@@ -137,7 +137,7 @@ Para la primera vez, crea el Resource Group manualmente:
 
 ```bash
 # Crear Resource Group
-az group create --name fulgencioB-rg --location "West Europe"
+az group create --name fulgenciob-rg --location "West Europe"
 ```
 
 **Nota**: El ACR y otros recursos se crearán automáticamente con Terraform. Ya no necesitas crear el ACR manualmente.
@@ -150,7 +150,7 @@ Para almacenar el estado de Terraform en Azure:
 # Crear Storage Account para el estado
 az storage account create \
   --name tfstatefulgenciob \
-  --resource-group fulgencioB-rg \
+  --resource-group fulgenciob-rg \
   --location "West Europe" \
   --sku Standard_LRS
 
@@ -164,7 +164,7 @@ Luego actualiza `terraform/main.tf` en la sección `backend`:
 
 ```hcl
 backend "azurerm" {
-  resource_group_name  = "fulgencioB-rg"
+  resource_group_name  = "fulgenciob-rg"
   storage_account_name = "tfstatefulgenciob"
   container_name       = "tfstate"
   key                  = "fulgencioB.terraform.tfstate"
@@ -181,7 +181,7 @@ cp terraform.tfvars.example terraform.tfvars
 Edita `terraform/terraform.tfvars` y rellena los valores:
 
 ```hcl
-resource_group_name = "fulgencioB-rg"
+resource_group_name = "fulgenciob-rg"
 location            = "West Europe"
 project_name        = "fulgenciob"
 acr_name            = "fulgenciobacr"  # Debe ser único, solo minúsculas y números
@@ -286,20 +286,20 @@ terraform apply -var="cors_origins=https://tu-frontend-url.azurecontainerapps.io
 # Backend
 az containerapp logs show \
   --name fulgenciob-backend \
-  --resource-group fulgencioB-rg \
+  --resource-group fulgenciob-rg \
   --follow
 
 # Frontend
 az containerapp logs show \
   --name fulgenciob-frontend \
-  --resource-group fulgencioB-rg \
+  --resource-group fulgenciob-rg \
   --follow
 ```
 
 ### Verificar estado de los recursos
 
 ```bash
-az containerapp list --resource-group fulgencioB-rg --output table
+az containerapp list --resource-group fulgenciob-rg --output table
 ```
 
 ### Problemas comunes
@@ -317,7 +317,7 @@ az containerapp list --resource-group fulgencioB-rg --output table
 - Verifica que las imágenes se subieron correctamente: `az acr repository list --name fulgenciobacr`
 
 #### Error: "Container App not accessible"
-- Verifica que el ingress está habilitado: `az containerapp ingress show --name fulgenciob-frontend --resource-group fulgencioB-rg`
+- Verifica que el ingress está habilitado: `az containerapp ingress show --name fulgenciob-frontend --resource-group fulgenciob-rg`
 - Verifica los logs del contenedor para errores de aplicación
 
 ## 📚 Recursos Adicionales

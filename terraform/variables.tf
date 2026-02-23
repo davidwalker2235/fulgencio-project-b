@@ -1,7 +1,7 @@
 variable "resource_group_name" {
   description = "Nombre del grupo de recursos de Azure"
   type        = string
-  default     = "fulgencioB-rg"
+  default     = "fulgenciob-rg"
 }
 
 variable "location" {
