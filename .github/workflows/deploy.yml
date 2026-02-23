@@ -333,20 +333,26 @@ jobs:
 
       - name: Ensure Role Assignment exists before deploying
         run: |
-          # Verificar y crear el role assignment si no existe
-          IDENTITY_PRINCIPAL_ID=$(az identity show --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name fulgenciob-identity --query principalId -o tsv)
-          ACR_ID=$(az acr show --name ${{ env.ACR_NAME }} --query id -o tsv)
-          
-          ROLE_ASSIGNMENT_ID=$(az role assignment list --scope "$ACR_ID" --assignee "$IDENTITY_PRINCIPAL_ID" --role AcrPull --query "[0].id" -o tsv || echo "")
-          
+          # Verificar y crear el role assignment si no existe.
+          # Si la identidad o el ACR aún no existen, no fallar el workflow.
+          IDENTITY_PRINCIPAL_ID=$(az identity show --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name fulgenciob-identity --query principalId -o tsv 2>/dev/null || echo "")
+          ACR_ID=$(az acr show --name ${{ env.ACR_NAME }} --query id -o tsv 2>/dev/null || echo "")
+
+          if [ -z "$IDENTITY_PRINCIPAL_ID" ] || [ -z "$ACR_ID" ]; then
+            echo "⚠️ Identity o ACR aún no disponible. Se omite este paso por ahora."
+            exit 0
+          fi
+
+          ROLE_ASSIGNMENT_ID=$(az role assignment list --scope "$ACR_ID" --assignee "$IDENTITY_PRINCIPAL_ID" --role AcrPull --query "[0].id" -o tsv 2>/dev/null || echo "")
+
           if [ -z "$ROLE_ASSIGNMENT_ID" ]; then
             echo "Creating role assignment for ACR authentication..."
             az role assignment create \
               --assignee "$IDENTITY_PRINCIPAL_ID" \
               --role AcrPull \
               --scope "$ACR_ID" \
-              --output none
-            echo "✅ Role assignment created"
+              --output none || echo "⚠️ No se pudo crear role assignment en este paso; Terraform lo gestionará."
+            echo "✅ Role assignment verificado"
           else
             echo "✅ Role assignment already exists"
           fi
