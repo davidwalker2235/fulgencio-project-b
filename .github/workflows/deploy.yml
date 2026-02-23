@@ -265,7 +265,7 @@ jobs:
           IDENTITY_PRINCIPAL_ID=$(az identity show --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name fulgenciob-identity --query principalId -o tsv 2>/dev/null || echo "")
           ACR_ID=$(az acr show --name ${{ env.ACR_NAME }} --query id -o tsv 2>/dev/null || echo "")
           if [ ! -z "$IDENTITY_PRINCIPAL_ID" ] && [ ! -z "$ACR_ID" ]; then
-            ROLE_ASSIGNMENT_ID=$(az role assignment list --scope "$ACR_ID" --assignee "$IDENTITY_PRINCIPAL_ID" --role AcrPull --query "[0].id" -o tsv 2>/dev/null || echo "")
+            ROLE_ASSIGNMENT_ID=$(az role assignment list --scope "$ACR_ID" --query "[?roleDefinitionName=='AcrPull' && principalId=='$IDENTITY_PRINCIPAL_ID'] | [0].id" -o tsv 2>/dev/null || echo "")
             if [ ! -z "$ROLE_ASSIGNMENT_ID" ]; then
               if ! terraform state show azurerm_role_assignment.acr_pull 2>/dev/null; then
                 echo "Role Assignment exists but not in state. Importing..."
@@ -343,7 +343,7 @@ jobs:
             exit 0
           fi
 
-          ROLE_ASSIGNMENT_ID=$(az role assignment list --scope "$ACR_ID" --assignee "$IDENTITY_PRINCIPAL_ID" --role AcrPull --query "[0].id" -o tsv 2>/dev/null || echo "")
+          ROLE_ASSIGNMENT_ID=$(az role assignment list --scope "$ACR_ID" --query "[?roleDefinitionName=='AcrPull' && principalId=='$IDENTITY_PRINCIPAL_ID'] | [0].id" -o tsv 2>/dev/null || echo "")
 
           if [ -z "$ROLE_ASSIGNMENT_ID" ]; then
             echo "Creating role assignment for ACR authentication..."
