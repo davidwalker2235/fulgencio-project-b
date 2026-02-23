@@ -14,6 +14,9 @@ azure_openai_api_key  = "tu_api_key_aqui"
 azure_openai_api_version = "2024-10-01-preview"
 model_name           = "gpt-realtime"
 firebase_database_url = "https://tu-proyecto-default-rtdb.europe-west1.firebasedatabase.app"
+# Opcional para Azure: pega aquí el JSON completo del service account de Firebase en una sola línea.
+# En CI/CD es mejor pasarlo por secreto FIREBASE_SERVICE_ACCOUNT_JSON.
+firebase_service_account_json = ""
 
 # CORS - Se actualizará automáticamente con el FQDN del frontend después del primer despliegue
 cors_origins = "https://fulgenciob-frontend.*.azurecontainerapps.io"

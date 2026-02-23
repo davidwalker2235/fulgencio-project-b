@@ -59,6 +59,7 @@ AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-01-pre
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-realtime")
 FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL", "")
 FIREBASE_SERVICE_ACCOUNT_PATH = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "")
+FIREBASE_SERVICE_ACCOUNT_JSON = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
 USER_DATA_API_URL = os.getenv("USER_DATA_API_URL", "").strip()
 USER_DATA_API_TIMEOUT_SECONDS = int(os.getenv("USER_DATA_API_TIMEOUT_SECONDS", "5"))
 USER_DATA_API_RETRIES = int(os.getenv("USER_DATA_API_RETRIES", "2"))
@@ -118,14 +119,36 @@ def initialize_firebase():
         print("⚠️ FIREBASE_DATABASE_URL no configurado.")
         return
 
-    if not FIREBASE_SERVICE_ACCOUNT_PATH:
-        print("ℹ️ FIREBASE_SERVICE_ACCOUNT_PATH no configurado. Se usará fallback REST para lectura pública.")
+    cred = None
+    cred_source = ""
+
+    # Azure: preferimos recibir credenciales como JSON en secreto/env var.
+    if FIREBASE_SERVICE_ACCOUNT_JSON.strip():
+        try:
+            service_account_info = json.loads(FIREBASE_SERVICE_ACCOUNT_JSON)
+            cred = credentials.Certificate(service_account_info)
+            cred_source = "FIREBASE_SERVICE_ACCOUNT_JSON"
+        except Exception as err:
+            print(f"⚠️ FIREBASE_SERVICE_ACCOUNT_JSON inválido: {err}")
+
+    # Local: fallback habitual a archivo JSON en disco.
+    if cred is None and FIREBASE_SERVICE_ACCOUNT_PATH:
+        try:
+            cred = credentials.Certificate(FIREBASE_SERVICE_ACCOUNT_PATH)
+            cred_source = "FIREBASE_SERVICE_ACCOUNT_PATH"
+        except Exception as err:
+            print(f"⚠️ FIREBASE_SERVICE_ACCOUNT_PATH inválido: {err}")
+
+    if cred is None:
+        print(
+            "ℹ️ Firebase Admin no configurado (faltan credenciales). "
+            "Se usará fallback REST para lectura pública."
+        )
         return
 
     try:
-        cred = credentials.Certificate(FIREBASE_SERVICE_ACCOUNT_PATH)
         firebase_app = initialize_app(cred, {"databaseURL": FIREBASE_DATABASE_URL})
-        print("✅ Firebase Admin inicializado correctamente.")
+        print(f"✅ Firebase Admin inicializado correctamente usando {cred_source}.")
     except Exception as err:
         firebase_app = None
         print(f"⚠️ Error inicializando Firebase Admin: {err}")
@@ -610,6 +633,7 @@ async def firebase_health():
     return {
         "database_url_configured": bool(FIREBASE_DATABASE_URL),
         "service_account_path_configured": bool(FIREBASE_SERVICE_ACCOUNT_PATH),
+        "service_account_json_configured": bool(FIREBASE_SERVICE_ACCOUNT_JSON.strip()),
         "admin_sdk_initialized": firebase_app is not None,
     }
 

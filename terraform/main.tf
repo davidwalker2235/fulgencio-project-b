@@ -16,6 +16,10 @@ provider "azurerm" {
   }
 }
 
+locals {
+  has_firebase_service_account_json = trimspace(var.firebase_service_account_json) != ""
+}
+
 # Resource Group
 resource "azurerm_resource_group" "main" {
   name     = var.resource_group_name
@@ -134,6 +138,14 @@ resource "azurerm_container_app" "backend" {
         value = var.firebase_database_url
       }
 
+      dynamic "env" {
+        for_each = local.has_firebase_service_account_json ? [1] : []
+        content {
+          name        = "FIREBASE_SERVICE_ACCOUNT_JSON"
+          secret_name = "firebase-service-account-json"
+        }
+      }
+
       env {
         name  = "CORS_ORIGINS"
         value = var.cors_origins
@@ -190,6 +202,14 @@ resource "azurerm_container_app" "backend" {
   secret {
     name  = "azure-openai-api-key"
     value = var.azure_openai_api_key
+  }
+
+  dynamic "secret" {
+    for_each = local.has_firebase_service_account_json ? [1] : []
+    content {
+      name  = "firebase-service-account-json"
+      value = var.firebase_service_account_json
+    }
   }
 
   tags = var.tags

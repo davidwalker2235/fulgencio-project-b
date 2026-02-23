@@ -112,6 +112,13 @@ variable "firebase_database_url" {
   default     = ""
 }
 
+variable "firebase_service_account_json" {
+  description = "JSON de service account de Firebase Admin SDK (recomendado para Azure)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "cors_origins" {
   description = "Orígenes permitidos para CORS"
   type        = string
