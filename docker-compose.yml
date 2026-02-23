@@ -5,7 +5,7 @@ services:
     build:
       context: ./back
       dockerfile: Dockerfile
-    container_name: fulgencioB-backend
+    container_name: fulgenciob-backend
     ports:
       - "8000:8000"
     environment:
@@ -17,13 +17,13 @@ services:
       - ./back:/app
     restart: unless-stopped
     networks:
-      - fulgencioB-network
+      - fulgenciob-network
 
   frontend:
     build:
       context: ./front
       dockerfile: Dockerfile
-    container_name: fulgencioB-frontend
+    container_name: fulgenciob-frontend
     ports:
       - "8080:3000"
     environment:
@@ -34,9 +34,9 @@ services:
       - backend
     restart: unless-stopped
     networks:
-      - fulgencioB-network
+      - fulgenciob-network
 
 networks:
-  fulgencioB-network:
+  fulgenciob-network:
     driver: bridge
 

@@ -13,7 +13,7 @@ variable "location" {
 variable "project_name" {
   description = "Nombre del proyecto (usado para nombrar recursos)"
   type        = string
-  default     = "fulgencioB"
+  default     = "fulgenciob"
 }
 
 variable "acr_name" {
@@ -109,7 +109,7 @@ variable "model_name" {
 variable "cors_origins" {
   description = "Orígenes permitidos para CORS"
   type        = string
-  default     = "https://fulgencioB-frontend.*.azurecontainerapps.io"
+  default     = "https://fulgenciob-frontend.*.azurecontainerapps.io"
 }
 
 # Tags de imagen para forzar nueva revisión en cada deploy (evita reinicio manual)

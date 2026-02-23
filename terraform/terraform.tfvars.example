@@ -3,7 +3,7 @@
 
 resource_group_name = "fulgencioB-rg"
 location            = "West Europe"
-project_name        = "fulgencioB"
+project_name        = "fulgenciob"
 acr_name            = "fulgenciobacr"  # Debe ser único globalmente, solo minúsculas y números
 
 # Azure OpenAI Configuration
@@ -15,7 +15,7 @@ azure_openai_api_version = "2024-10-01-preview"
 model_name           = "gpt-realtime"
 
 # CORS - Se actualizará automáticamente con el FQDN del frontend después del primer despliegue
-cors_origins = "https://fulgencioB-frontend.*.azurecontainerapps.io"
+cors_origins = "https://fulgenciob-frontend.*.azurecontainerapps.io"
 
 # Recursos del backend
 backend_min_replicas = 1

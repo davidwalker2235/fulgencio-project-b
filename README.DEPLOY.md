@@ -183,7 +183,7 @@ Edita `terraform/terraform.tfvars` y rellena los valores:
 ```hcl
 resource_group_name = "fulgencioB-rg"
 location            = "West Europe"
-project_name        = "fulgencioB"
+project_name        = "fulgenciob"
 acr_name            = "fulgenciobacr"  # Debe ser único, solo minúsculas y números
 
 azure_openai_endpoint = "https://services-aida-apps-sweden.cognitiveservices.azure.com"
@@ -268,7 +268,7 @@ Después del primer despliegue, necesitas actualizar el CORS con la URL real del
 2. Actualiza `terraform/terraform.tfvars`:
 
 ```hcl
-cors_origins = "https://fulgencioB-frontend-xxxxx.azurecontainerapps.io"
+cors_origins = "https://fulgenciob-frontend-xxxxx.azurecontainerapps.io"
 ```
 
 3. O actualiza directamente en Azure Portal o ejecuta:
@@ -285,13 +285,13 @@ terraform apply -var="cors_origins=https://tu-frontend-url.azurecontainerapps.io
 ```bash
 # Backend
 az containerapp logs show \
-  --name fulgencioB-backend \
+  --name fulgenciob-backend \
   --resource-group fulgencioB-rg \
   --follow
 
 # Frontend
 az containerapp logs show \
-  --name fulgencioB-frontend \
+  --name fulgenciob-frontend \
   --resource-group fulgencioB-rg \
   --follow
 ```
@@ -317,7 +317,7 @@ az containerapp list --resource-group fulgencioB-rg --output table
 - Verifica que las imágenes se subieron correctamente: `az acr repository list --name fulgenciobacr`
 
 #### Error: "Container App not accessible"
-- Verifica que el ingress está habilitado: `az containerapp ingress show --name fulgencioB-frontend --resource-group fulgencioB-rg`
+- Verifica que el ingress está habilitado: `az containerapp ingress show --name fulgenciob-frontend --resource-group fulgencioB-rg`
 - Verifica los logs del contenedor para errores de aplicación
 
 ## 📚 Recursos Adicionales

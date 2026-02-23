@@ -4,7 +4,7 @@ export const WEBSOCKET_URL =
   process.env.NEXT_PUBLIC_WS_URL || 
   (typeof window !== "undefined" 
     ? (window.location.protocol === "https:" 
-        ? `wss://${window.location.hostname.replace('fulgencioB-frontend', 'fulgencioB-backend')}/ws`
+        ? `wss://${window.location.hostname.replace('fulgenciob-frontend', 'fulgenciob-backend')}/ws`
         : `ws://${window.location.hostname}:8000/ws`)
     : "ws://localhost:8000/ws");
 
