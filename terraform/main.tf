@@ -138,6 +138,41 @@ resource "azurerm_container_app" "backend" {
         name  = "CORS_ORIGINS"
         value = var.cors_origins
       }
+
+      env {
+        name  = "VOICE_AGENT_TYPE"
+        value = var.voice_agent_type
+      }
+
+      env {
+        name        = "ERNI_AGENT_URL"
+        secret_name = "erni-agent-url"
+      }
+
+      env {
+        name  = "MODEL_IMAGE_NAME"
+        value = var.model_image_name
+      }
+
+      env {
+        name  = "AZURE_OPENAI_IMAGE_API_VERSION"
+        value = var.azure_openai_image_api_version
+      }
+
+      env {
+        name  = "AZURE_OPENAI_IMAGE_PROMPT"
+        value = var.azure_openai_image_prompt
+      }
+
+      env {
+        name  = "AZURE_OPENAI_IMAGE_ENDPOINT"
+        value = var.azure_openai_image_endpoint != "" ? var.azure_openai_image_endpoint : "${trimspace(trim(var.azure_openai_endpoint, "/"))}/openai/deployments/${var.model_image_name}/images/generations"
+      }
+
+      env {
+        name  = "AZURE_OPENAI_IMAGE_EDITS_ENDPOINT"
+        value = var.azure_openai_image_edits_endpoint != "" ? var.azure_openai_image_edits_endpoint : "${trimspace(trim(var.azure_openai_endpoint, "/"))}/openai/deployments/${var.model_image_name}/images/edits"
+      }
     }
   }
 
@@ -160,6 +195,11 @@ resource "azurerm_container_app" "backend" {
   secret {
     name  = "azure-openai-api-key"
     value = var.azure_openai_api_key
+  }
+
+  secret {
+    name  = "erni-agent-url"
+    value = var.erni_agent_url
   }
 
   tags = var.tags

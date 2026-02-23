@@ -109,12 +109,58 @@ variable "model_name" {
 variable "firebase_database_url" {
   description = "URL de Firebase Realtime Database"
   type        = string
+  default     = ""
 }
 
 variable "cors_origins" {
   description = "Orígenes permitidos para CORS"
   type        = string
   default     = "https://fulgenciob-frontend.*.azurecontainerapps.io"
+}
+
+# Voice agent (erni_agent | azure_agent)
+variable "voice_agent_type" {
+  description = "Tipo de agente de voz: erni_agent o azure_agent"
+  type        = string
+  default     = "erni_agent"
+}
+
+variable "erni_agent_url" {
+  description = "URL del WebSocket de Erni Agent (incluye credenciales)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+# Imagen / caricaturas (Azure OpenAI gpt-image-1.5)
+variable "model_image_name" {
+  description = "Nombre del modelo de imagen Azure OpenAI"
+  type        = string
+  default     = "gpt-image-1.5"
+}
+
+variable "azure_openai_image_api_version" {
+  description = "Version de la API de generacion de imagenes"
+  type        = string
+  default     = "2025-04-01-preview"
+}
+
+variable "azure_openai_image_prompt" {
+  description = "Prompt para generacion de caricaturas"
+  type        = string
+  default     = "Make an exaggerated caricature of the person appearing in this photo in a line drawing style. I want the lines to be thin and the details to be as minimalist as possible while preserving the exaggerated proportions."
+}
+
+variable "azure_openai_image_endpoint" {
+  description = "Endpoint de generacion de imagenes (vacio = se construye desde azure_openai_endpoint)"
+  type        = string
+  default     = ""
+}
+
+variable "azure_openai_image_edits_endpoint" {
+  description = "Endpoint de edicion de imagenes para caricaturas (vacio = se construye desde azure_openai_endpoint)"
+  type        = string
+  default     = ""
 }
 
 # Tags de imagen para forzar nueva revisión en cada deploy (evita reinicio manual)
