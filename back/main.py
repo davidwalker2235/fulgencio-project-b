@@ -73,7 +73,7 @@ AZURE_OPENAI_IMAGE_API_VERSION = os.getenv(
 )
 AZURE_OPENAI_IMAGE_PROMPT = os.getenv(
     "AZURE_OPENAI_IMAGE_PROMPT",
-    "Make an exaggerated caricature of the person appearing in this photo in a line drawing style.",
+    "Make an exaggerated caricature of the person appearing in this photo in a line drawing style. I want the lines to be thin and the details to be as minimalist as possible while preserving the exaggerated proportions.",
 )
 AZURE_OPENAI_IMAGE_ENDPOINT = os.getenv(
     "AZURE_OPENAI_IMAGE_ENDPOINT",
