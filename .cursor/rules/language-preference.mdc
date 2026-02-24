@@ -1,0 +1,12 @@
+---
+description: Language policy for assistant responses
+alwaysApply: true
+---
+
+# Response Language Policy
+
+- Default response language is English for this project.
+- Automatically reply in the same language as the user's latest message.
+- If the user writes in Spanish, switch to Spanish immediately.
+- If the user writes in English, switch to English immediately.
+- Keep each response in a single language unless the user explicitly asks for bilingual output.

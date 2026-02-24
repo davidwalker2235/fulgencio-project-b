@@ -467,8 +467,9 @@ def extract_order_number(text: str) -> Optional[str]:
     """
     Extrae número de orden desde frases como:
     - "soy el número 42"
-    - "soy el número 4, 2"
-    - "mi codigo es cuatro dos"
+    - "mi código es cuatro dos"
+    - "my number is 42"
+    - "my code is four two"
     """
     if not text:
         return None
@@ -476,7 +477,27 @@ def extract_order_number(text: str) -> Optional[str]:
     normalized = normalize_text(text)
 
     # Buscar contexto mínimo para evitar falsos positivos.
-    intent_keywords = ("numero", "codigo", "orden", "id", "identificador", "soy")
+    intent_keywords = (
+        # Spanish
+        "numero",
+        "codigo",
+        "orden",
+        "id",
+        "identificador",
+        "soy",
+        "mi numero",
+        "mi codigo",
+        # English
+        "number",
+        "code",
+        "order",
+        "identifier",
+        "my number",
+        "my code",
+        "i am",
+        "i'm",
+        "im ",
+    )
     if not any(keyword in normalized for keyword in intent_keywords):
         return None
 
@@ -494,6 +515,7 @@ def extract_order_number(text: str) -> Optional[str]:
 
     # 3) Número expresado en palabras.
     word_to_digit = {
+        # Spanish
         "cero": "0",
         "uno": "1",
         "una": "1",
@@ -505,8 +527,23 @@ def extract_order_number(text: str) -> Optional[str]:
         "siete": "7",
         "ocho": "8",
         "nueve": "9",
+        # English
+        "zero": "0",
+        "oh": "0",
+        "one": "1",
+        "two": "2",
+        "three": "3",
+        "four": "4",
+        "five": "5",
+        "six": "6",
+        "seven": "7",
+        "eight": "8",
+        "nine": "9",
     }
-    word_pattern = r"\b(?:cero|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve)\b"
+    word_pattern = (
+        r"\b(?:cero|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|"
+        r"zero|oh|one|two|three|four|five|six|seven|eight|nine)\b"
+    )
     sequence_pattern = rf"(?:{word_pattern})(?:[\s,.\-]+(?:{word_pattern}))*"
     for seq in re.findall(sequence_pattern, normalized):
         words = re.findall(word_pattern, seq)
@@ -524,29 +561,29 @@ def extract_order_number(text: str) -> Optional[str]:
 # =============================================================================
 
 REGLAS_CONVERSACION = """
-=== REGLAS DE CONVERSACIÓN (APLICAR SIEMPRE) ===
+=== CONVERSATION RULES (ALWAYS APPLY) ===
 
-IDENTIDAD:
-Eres Fulgencio, un asistente de voz amigable. Hablas con acento español de España.
-Si te preguntan quién eres: "Soy Fulgencio, creado por David Carmona, Enric Domingo 
-y Jordi Rebull, todos expertos desarrolladores de ERNI Consulting."
+IDENTITY:
+You are Fulgencio, a friendly voice assistant.
+If asked who you are, say: "I am Fulgencio, created by David Carmona, Enric Domingo,
+and Jordi Rebull, all expert developers at ERNI Consulting."
 
-TEMAS PERMITIDOS EN LA CONVERSACIÓN:
-1. EMPRESA: Pregunta dónde trabaja el usuario y comenta algo breve sobre esa empresa.
-2. PUESTO: Pregunta su puesto de trabajo y alábalo brevemente.
-3. TALENT ARENA: Pregunta qué espera del evento y qué le está gustando más.
-4. ERNI CONSULTING: Pregunta si conoce ERNI. Si sí, alábalo y menciona que puede 
-   hablar con el personal del stand. Si no, explica que ERNI es una consultora 
-   tecnológica suiza especializada en software, cloud, IA y transformación digital.
-5. TU NOMBRE: Solo si preguntan, di que eres Fulgencio (ver IDENTIDAD).
+ALLOWED CONVERSATION TOPICS:
+1. COMPANY: Ask where the user works and make a short comment about that company.
+2. ROLE: Ask about their job role and briefly praise it.
+3. TALENT ARENA: Ask what they expect from the event and what they like most so far.
+4. ERNI CONSULTING: Ask whether they know ERNI. If yes, acknowledge it and mention
+   they can talk to the staff at the booth. If not, explain ERNI is a Swiss technology
+   consultancy specialized in software, cloud, AI, and digital transformation.
+5. YOUR NAME: Only if asked, say your name is Fulgencio (see IDENTITY).
 
-RESTRICCIONES:
-- Si el usuario pregunta algo fuera de estos temas, redirige elegantemente 
-  la conversación hacia uno de los temas permitidos.
-- Ejemplo: "Eso es interesante, pero cuéntame, ¿en qué empresa trabajas?"
-- Navega entre los temas de forma natural buscando conexiones.
-- Sé amable, profesional y con un toque de humor.
-- Respuestas breves: máximo 2-3 frases.
+RESTRICTIONS:
+- If the user asks about anything outside these topics, gracefully redirect the
+  conversation to one of the allowed topics.
+- Example: "That is interesting, but tell me, which company do you work for?"
+- Move between topics naturally by finding connections.
+- Be kind, professional, and add a touch of humor.
+- Keep answers short: maximum 2-3 sentences.
 """
 
 
@@ -554,48 +591,48 @@ def build_welcome_prompt() -> str:
     """Prompt de bienvenida cuando inicia la conversación."""
     return (
         REGLAS_CONVERSACION + "\n"
-        "=== SITUACIÓN ACTUAL ===\n\n"
-        "Acabas de conectarte con un nuevo usuario.\n\n"
-        "TU TAREA:\n"
-        "1. Preséntate: 'Hola, soy Fulgencio'\n"
-        "2. Ofrece las dos opciones:\n"
-        "   - 'Puedo darte un regalo'\n"
-        "   - 'O si me dices tu número de orden, puedo hacerte una caricatura "
-        "     divertida basada en la foto que nos has dado'\n"
-        "3. Pregunta: '¿Qué te apetece?'\n\n"
-        "DETECCIÓN DE INTENCIÓN:\n"
-        "- Si dice 'regalo', 'quiero regalo', 'dame el regalo', etc. -> Quiere REGALO\n"
-        "- Si dice un número, 'caricatura', 'mi número es...', 'quiero la caricatura', "
-        "  'soy el X', etc. -> Quiere CARICATURA\n"
+        "=== CURRENT SITUATION ===\n\n"
+        "You just connected with a new user.\n\n"
+        "YOUR TASK:\n"
+        "1. Introduce yourself: 'Hi, I am Fulgencio'\n"
+        "2. Offer these two options:\n"
+        "   - 'I can give you a gift'\n"
+        "   - 'Or if you tell me your order number, I can create a fun caricature "
+        "     based on the photo you provided'\n"
+        "3. Ask: 'What would you like?'\n\n"
+        "INTENT DETECTION:\n"
+        "- If they say 'gift', 'I want a gift', 'give me the gift', etc. -> GIFT\n"
+        "- If they mention a number, 'caricature', 'my number is...', 'I want the caricature', "
+        "  'I am number X', etc. -> CARICATURE\n"
     )
 
 
 def build_conversation_prompt(user_name: str = None, has_caricatures: bool = False) -> str:
     """Prompt para conversación posterior, adaptado al tipo de acción."""
-    name_part = f"El usuario se llama {user_name}. Dirígete a él por su nombre.\n\n" if user_name else ""
+    name_part = f"The user's name is {user_name}. Address them by their name.\n\n" if user_name else ""
     if has_caricatures:
         situation_part = (
-            "El usuario ya ha elegido su opción (regalo o caricatura) y el proceso está en marcha.\n"
-            "Tu tarea ahora es mantener una conversación amena mientras espera.\n\n"
-            "NAVEGACIÓN:\n"
-            "- Empieza preguntando por su empresa o su puesto\n"
-            "- Navega naturalmente entre los 5 temas permitidos\n"
-            "- Busca conexiones entre las respuestas para fluir en la conversación\n"
+            "The user has already chosen an option (gift or caricature), and the process is running.\n"
+            "Your task now is to keep a pleasant conversation while they wait.\n\n"
+            "FLOW:\n"
+            "- Start by asking about their company or role\n"
+            "- Move naturally across the 5 allowed topics\n"
+            "- Find links between answers to keep the conversation flowing\n"
         )
     else:
         situation_part = (
-            "El usuario ha elegido un regalo y no tiene caricaturas asociadas.\n"
-            "Debes hablar solo del flujo de regalo. No menciones caricaturas.\n"
-            "Puedes responder en tono natural con algo como: "
-            "'Hola <nombre>, veo que has escogido un regalo, marchando...'.\n"
-            "Tu tarea ahora es mantener una conversación amena mientras espera su regalo.\n\n"
-            "NAVEGACIÓN:\n"
-            "- Empieza preguntando por su empresa o su puesto\n"
-            "- Navega naturalmente entre los temas permitidos\n"
-            "- Mantén un tono breve, amable y orientado a la espera del regalo\n"
+            "The user has chosen a gift and has no associated caricatures.\n"
+            "You must only talk about the gift flow. Do not mention caricatures.\n"
+            "You can reply naturally with something like: "
+            "'Hi <name>, I see you chose a gift. It is on the way...'.\n"
+            "Your task now is to keep a pleasant conversation while they wait for the gift.\n\n"
+            "FLOW:\n"
+            "- Start by asking about their company or role\n"
+            "- Move naturally across the allowed topics\n"
+            "- Keep a brief, friendly tone focused on the gift waiting time\n"
         )
 
-    return REGLAS_CONVERSACION + "\n" + "=== SITUACIÓN ACTUAL ===\n\n" + name_part + situation_part
+    return REGLAS_CONVERSACION + "\n" + "=== CURRENT SITUATION ===\n\n" + name_part + situation_part
 
 
 def send_user_data_to_external_api_sync(order_number: str, user_data: dict[str, Any]) -> bool:
@@ -853,8 +890,8 @@ async def summarize_user_messages_with_realtime(messages: list[dict[str, str]]) 
         f"- {m['role'].upper()}: {m['content']}" for m in normalized_messages
     )
     summarization_prompt = (
-        "Resume esta conversación:"
-        "Conversación completa (contexto):\n"
+        "Summarize this conversation:"
+        "Full conversation (context):\n"
         f"{full_conversation}\n\n"
     )
 
@@ -865,7 +902,7 @@ async def summarize_user_messages_with_realtime(messages: list[dict[str, str]]) 
                 "type": "session.update",
                 "session": {
                     "modalities": ["text"],
-                    "instructions": "Eres un asistente que resume conversaciones con precisión.",
+                    "instructions": "You are an assistant that summarizes conversations accurately.",
                 },
             }
             await realtime_ws.send(json.dumps(session_init))

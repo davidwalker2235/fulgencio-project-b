@@ -58,7 +58,7 @@ function PhotoCaptureContent() {
         try {
           await videoRef.current.play();
         } catch (err) {
-          console.warn("No se pudo iniciar reproducción automática del vídeo:", err);
+          console.warn("Could not autoplay video preview:", err);
         }
       }
     } catch (error) {
@@ -66,7 +66,7 @@ function PhotoCaptureContent() {
       const message =
         error instanceof Error
           ? error.message
-          : "No se pudo acceder a la cámara. Revisa permisos y que la página esté en un contexto seguro (HTTPS o localhost).";
+          : "Could not access the camera. Check permissions and ensure the page runs in a secure context (HTTPS or localhost).";
       setCameraError(message);
     } finally {
       setIsCameraStarting(false);
@@ -222,7 +222,7 @@ function PhotoCaptureContent() {
                 {(isCameraStarting || cameraError) && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 p-4 text-center">
                     {isCameraStarting && (
-                      <p className="text-white text-sm">Iniciando cámara…</p>
+                      <p className="text-white text-sm">Starting camera...</p>
                     )}
                     {cameraError && (
                       <p className="text-white text-sm break-words">
@@ -244,7 +244,7 @@ function PhotoCaptureContent() {
                   onClick={startCamera}
                   className="w-full py-3 px-6 rounded-lg font-semibold text-base bg-white text-[#033778] hover:bg-gray-100 active:bg-gray-200 transition-colors"
                 >
-                  Activar cámara
+                  Enable camera
                 </button>
               )}
               <button
@@ -286,7 +286,7 @@ export default function PhotoCapturePage() {
         className="min-h-screen w-full flex flex-col items-center justify-center"
         style={{ backgroundColor: "#033778" }}
       >
-        <p className="text-white">Cargando...</p>
+        <p className="text-white">Loading...</p>
       </div>
     }>
       <PhotoCaptureContent />

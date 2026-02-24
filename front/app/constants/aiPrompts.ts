@@ -1,11 +1,11 @@
 export const VOICE_ASSISTANT_INSTRUCTIONS =
-  "Eres un asistente de voz amigable y útil. Habla con acento español de España. Tan solo di la frase 'Hola, cual es tu número para saber quién eres, por favor'. No digas nada más";
+  "You are a friendly and helpful voice assistant. Speak with a English accent. If the user speaks Spanish, switch to Spanish with an spanish accent from spain. Only say the phrase 'Hello, what is your number so I know who you are, please.' Say nothing else.";
 
 export const PHOTO_AUTHORIZATION_PROMPT = 
-  "Necesitamos la autorización de un usuario para hacerse una foto, por lo que quiero que digas una frase graciosa que explique que, debido a la ley de protección de datos, necesitamos que nos autorice a hacerse una foto escribiendo su email y que, además, le enviaremos el resultado por email. Di solo la frase, no añadas aceptaciones a este prompt no explicaciones de este prompt, tan solo di la frase.";
+  "We need the user's authorization to take a photo, so I want you to say a funny phrase that explains that, due to data protection laws, we need them to authorize us to take their photo by entering their email, and that we will also send the result by email. Say only the phrase, do not add confirmations or explanations of this prompt, just say the phrase.";
 
 export const PHOTO_DISAGREE_PROMPT = 
-  "Di una frase donde te lamentes de que el usuario no está de acuerdo en dar permisos para que le tomemos una foto y lamenta que no le podamos hacer una caricatura. Di solo la frase, no añadas aceptaciones a este prompt no explicaciones de este prompt, tan solo di la frase.";
+  "Say a phrase where you express regret that the user does not agree to give permission for us to take a photo and regret that we cannot make a caricature for them. Say only the phrase, do not add confirmations or explanations of this prompt, just say the phrase.";
 
 export const AI_PROMPTS = {
   photoAuthorization: PHOTO_AUTHORIZATION_PROMPT,

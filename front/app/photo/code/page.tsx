@@ -66,7 +66,7 @@ export default function PhotoCodePage() {
         className="min-h-screen w-full flex flex-col items-center justify-center"
         style={{ backgroundColor: "#033778" }}
       >
-        <p className="text-white">Cargando...</p>
+        <p className="text-white">Loading...</p>
       </div>
     }>
       <PhotoCodeContent />
