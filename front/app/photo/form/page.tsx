@@ -11,9 +11,9 @@ export default function PhotoFormPage() {
   const [emailError, setEmailError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Prefetch para que el cambio a /photo/capture sea inmediato
+  // Prefetch para que el cambio a la pantalla de selección sea inmediato
   useEffect(() => {
-    router.prefetch("/photo/capture");
+    router.prefetch("/photo/selection");
   }, [router]);
 
   // Validar email con regex
@@ -51,7 +51,7 @@ export default function PhotoFormPage() {
 
     setIsSubmitting(true);
     
-    // Navegar a la pantalla de captura con los datos del formulario
+    // Navegar a la pantalla de selección con los datos del formulario
     const params = new URLSearchParams({
       name: fullName.trim(),
       email: email.trim(),
@@ -64,10 +64,10 @@ export default function PhotoFormPage() {
     }, 1500);
 
     try {
-      router.push(`/photo/capture?${params.toString()}`);
+      router.push(`/photo/selection?${params.toString()}`);
     } catch (err) {
-      console.error("Error navegando a /photo/capture:", err);
-      window.location.assign(`/photo/capture?${params.toString()}`);
+      console.error("Error navegando a /photo/selection:", err);
+      window.location.assign(`/photo/selection?${params.toString()}`);
     } finally {
       window.clearTimeout(unlockTimer);
     }
@@ -95,17 +95,21 @@ export default function PhotoFormPage() {
       {/* Form Container */}
       <div className="flex-1 flex flex-col items-center justify-start px-4 pb-8">
         <form onSubmit={handleSubmit} className="w-full max-w-md space-y-6 mt-4" noValidate>
-          {/* Lorem Ipsum Text */}
-          <div className="text-white text-sm sm:text-base leading-relaxed text-center px-2">
+        <div className="text-white text-sm sm:text-base leading-relaxed text-center px-2">
             <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. 
-              Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+            Please enter your name and email address so the robot can identify you.
             </p>
             <p className="mt-2">
-              Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+            You may choose between receiving a personalized caricature created by the robot or a gift.
             </p>
             <p className="mt-2">
-              Duis aute irure dolor in reprehenderit in voluptate velit esse cillum.
+            Your photo will be automatically deleted once the experience is completed.
+            </p>
+            <p className="mt-2">
+            After your photo has been processed, you will receive a reference number. Please provide this number to the robot to continue.
+            </p>
+            <p className="mt-2">
+            Kindly make sure to keep your reference number available.
             </p>
           </div>
 
@@ -149,7 +153,7 @@ export default function PhotoFormPage() {
                 : "bg-gray-400 text-gray-600 cursor-not-allowed"
             }`}
           >
-            {isSubmitting ? "Processing..." : "Take a photo"}
+            {isSubmitting ? "Processing..." : "Submit"}
           </button>
         </form>
       </div>

@@ -92,7 +92,12 @@ function PhotoCaptureContent() {
       if (context && video.readyState >= 2) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0);
+        // Efecto espejo para que la captura mantenga la misma orientación del preview.
+        context.save();
+        context.translate(canvas.width, 0);
+        context.scale(-1, 1);
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        context.restore();
         const photoData = canvas.toDataURL("image/jpeg");
         setPhoto(photoData);
         stopCamera();
@@ -212,7 +217,7 @@ function PhotoCaptureContent() {
                   autoPlay
                   playsInline
                   muted
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover -scale-x-100"
                 />
                 {(isCameraStarting || cameraError) && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 p-4 text-center">
