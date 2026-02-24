@@ -91,12 +91,16 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
   }, []);
 
   const summarizeUserMessages = useCallback(
-    async (messages: string[]): Promise<string> => {
-      const cleaned = messages
-        .map((m) => m.trim())
-        .filter((m) => m.length > 0);
+    async (messages: Message[]): Promise<string> => {
+      const normalized = messages
+        .map((m) => ({
+          role: m.role,
+          content: typeof m.content === "string" ? m.content.trim() : "",
+        }))
+        .filter((m) => m.content.length > 0);
 
-      if (cleaned.length === 0) {
+      const userMessageCount = normalized.filter((m) => m.role === "user").length;
+      if (userMessageCount === 0) {
         return "";
       }
 
@@ -107,13 +111,16 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ messages: cleaned }),
+          body: JSON.stringify({ messages: normalized }),
         });
 
         if (!response.ok) {
           const body = await response.text();
           console.error("❌ Error resumiendo transcripción:", response.status, body);
-          return cleaned.join(" | ");
+          return normalized
+            .filter((m) => m.role === "user")
+            .map((m) => m.content)
+            .join(" | ");
         }
 
         const data = (await response.json()) as { summary?: string };
@@ -124,7 +131,10 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
         console.error("❌ Error llamando al endpoint de resumen:", err);
       }
 
-      return cleaned.join(" | ");
+      return normalized
+        .filter((m) => m.role === "user")
+        .map((m) => m.content)
+        .join(" | ");
     },
     [resolveBackendHttpBaseUrl]
   );
@@ -593,7 +603,7 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
     stopRecording();
 
     // Siempre resetear currentUser al detener conversación.
-    void write("currentUser", "null").catch((err) => {
+    void write("currentUser", null).catch((err) => {
       console.error("❌ Error reseteando currentUser en Firebase:", err);
     });
 
@@ -612,7 +622,7 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
     if (targetUserId) {
       const timestamp = Date.now();
       void (async () => {
-        const summary = await summarizeUserMessages(userOnlyMessages);
+        const summary = await summarizeUserMessages(transcription);
         await write(`users/${targetUserId}/transcriptions/${timestamp}`, {
           summary,
           createdAt: new Date().toISOString(),

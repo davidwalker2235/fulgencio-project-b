@@ -724,7 +724,7 @@ class CaricatureGenerationRequest(BaseModel):
 
 
 class TranscriptionSummaryRequest(BaseModel):
-    messages: list[str]
+    messages: list[dict[str, str]]
 
 
 def build_user_summary_fallback(messages: list[str]) -> str:
@@ -768,8 +768,13 @@ def build_user_summary_fallback(messages: list[str]) -> str:
     if company_match:
         company = company_match.group(1).strip(" .")
 
-    # Interés genérico (último mensaje no vacío)
-    interest = cleaned[-1]
+    # Intereses: tomar hasta 3 mensajes relevantes y no vacíos.
+    relevant_interests = [
+        msg
+        for msg in cleaned
+        if len(msg) > 8 and not re.search(r"\b(si|no|vale|ok|todo)\b", normalize_text(msg))
+    ]
+    interests_text = "; ".join(relevant_interests[-3:]) if relevant_interests else cleaned[-1]
 
     parts: list[str] = []
     if name:
@@ -783,21 +788,42 @@ def build_user_summary_fallback(messages: list[str]) -> str:
         parts.append(f"Su rol es {job}.")
     if company:
         parts.append(f"Trabaja en {company}.")
-    if interest:
-        parts.append(f"Como interés principal comenta: {interest}.")
+    if interests_text:
+        parts.append(f"En cuanto a intereses e inquietudes, comenta: {interests_text}.")
 
-    return " ".join(parts[:4]).strip()
+    # Añadir cierre orientado a marketing sin inventar datos.
+    parts.append(
+        "Para seguimiento comercial, conviene profundizar en sus necesidades técnicas y en su contexto profesional."
+    )
+
+    summary = " ".join(parts).strip()
+    # Evitar salida con puntos suspensivos si vinieran en el texto original.
+    summary = re.sub(r"\.{3,}", ".", summary)
+    return summary
 
 
-async def summarize_user_messages_with_realtime(messages: list[str]) -> str:
+async def summarize_user_messages_with_realtime(messages: list[dict[str, str]]) -> str:
     """
     Resume solo los mensajes del usuario usando gpt-realtime en modo texto.
     """
-    cleaned_messages = [m.strip() for m in messages if isinstance(m, str) and m.strip()]
-    if not cleaned_messages:
+    normalized_messages: list[dict[str, str]] = []
+    for item in messages:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role", "")).strip().lower()
+        content = str(item.get("content", "")).strip()
+        if role not in ("user", "assistant") or not content:
+            continue
+        normalized_messages.append({"role": role, "content": content})
+
+    user_only_messages = [
+        m["content"] for m in normalized_messages if m["role"] == "user" and m["content"].strip()
+    ]
+
+    if not user_only_messages:
         return ""
     if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_API_KEY:
-        return build_user_summary_fallback(cleaned_messages)
+        return build_user_summary_fallback(user_only_messages)
 
     endpoint_base = AZURE_OPENAI_ENDPOINT.rstrip("/")
     if endpoint_base.startswith("https://"):
@@ -811,24 +837,30 @@ async def summarize_user_messages_with_realtime(messages: list[str]) -> str:
     )
     headers = {"api-key": AZURE_OPENAI_API_KEY}
 
-    joined_user_messages = "\n".join(f"- {msg}" for msg in cleaned_messages)
+    full_conversation = "\n".join(
+        f"- {m['role'].upper()}: {m['content']}" for m in normalized_messages
+    )
     summarization_prompt = (
         "Genera un resumen de perfil de cliente en español, más detallado y útil para marketing, "
         "usando SOLO lo dicho por el usuario. No inventes información.\n\n"
         "Formato de salida:\n"
-        "- Un único párrafo de 4 a 7 frases.\n"
-        "- Redacción natural en tercera persona.\n"
-        "- Sin viñetas, sin listas y sin citar literalmente frases del usuario.\n\n"
-        "Incluye SIEMPRE que esté disponible:\n"
+        "- Un único párrafo, redacción natural en tercera persona.\n"
+        "- sin límite de frases, con buen nivel de detalle.\n"
+        "- Sin viñetas, sin listas y sin citar literalmente frases del usuario.\n"
+        "- NO uses puntos suspensivos ('...').\n\n"
+        "Incluye SIEMPRE que se haya comentado en la conversación:\n"
         "1) Nombre.\n"
         "2) Edad.\n"
-        "3) Empresa/sector y rol profesional.\n"
+        "3) Empresa/sector donde trabaja y rol profesional.\n"
         "4) Intereses, inquietudes o motivaciones expresadas.\n"
         "5) Necesidades, problemas u objeciones detectadas.\n"
         "6) Intención o próximo paso sugerido para seguimiento comercial.\n\n"
-        "Si algún dato no aparece en los mensajes, omítelo sin rellenar huecos.\n\n"
-        "Mensajes del usuario:\n"
-        f"{joined_user_messages}"
+        "Si algún dato no aparece en los mensajes, indícalo de forma explícita como "
+        "'dato no mencionado por el usuario', sin inventar.\n\n"
+        "Conversación completa (contexto):\n"
+        f"{full_conversation}\n\n"
+        "IMPORTANTE: Aunque tienes toda la conversación para contexto, resume únicamente "
+        "la información aportada por el usuario."
     )
 
     collected_text_parts: list[str] = []
@@ -882,9 +914,9 @@ async def summarize_user_messages_with_realtime(messages: list[str]) -> str:
     if summary:
         # Si el modelo devolvió algo con formato de "lista pegada", usar fallback limpio.
         if summary.count("|") >= 2 and len(summary) > 120:
-            return build_user_summary_fallback(cleaned_messages)
+            return build_user_summary_fallback(user_only_messages)
         return summary
-    return build_user_summary_fallback(cleaned_messages)
+    return build_user_summary_fallback(user_only_messages)
 
 
 @app.get("/")
