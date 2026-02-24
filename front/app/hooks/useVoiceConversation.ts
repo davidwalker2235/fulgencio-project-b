@@ -10,6 +10,17 @@ import {
 } from "../services/audioUtils";
 import { useFirebase } from "./useFirebase";
 
+interface CurrentUserNode {
+  userId?: string;
+  user_id?: string;
+  caricatures: string[];
+  caricaturesTimestamp: string;
+  email: string;
+  fullName: string;
+  photo: string;
+  timestamp: string;
+}
+
 interface UseVoiceConversationReturn {
   isConnected: boolean;
   isRecording: boolean;
@@ -60,6 +71,95 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
+  const currentUserFirebaseIdRef = useRef<string | null>(null);
+
+  const resolveBackendHttpBaseUrl = useCallback((): string => {
+    const explicit = process.env.NEXT_PUBLIC_BACKEND_HTTP_URL;
+    if (explicit && explicit.trim()) {
+      return explicit.replace(/\/$/, "");
+    }
+
+    if (typeof window !== "undefined") {
+      const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+      const host = window.location.hostname;
+      if (host.includes("fulgenciob-frontend")) {
+        return `${protocol}//${host.replace("fulgenciob-frontend", "fulgenciob-backend")}`;
+      }
+    }
+
+    return "http://localhost:8000";
+  }, []);
+
+  const summarizeUserMessages = useCallback(
+    async (messages: string[]): Promise<string> => {
+      const cleaned = messages
+        .map((m) => m.trim())
+        .filter((m) => m.length > 0);
+
+      if (cleaned.length === 0) {
+        return "";
+      }
+
+      try {
+        const endpoint = `${resolveBackendHttpBaseUrl()}/transcriptions/summarize`;
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ messages: cleaned }),
+        });
+
+        if (!response.ok) {
+          const body = await response.text();
+          console.error("❌ Error resumiendo transcripción:", response.status, body);
+          return cleaned.join(" | ");
+        }
+
+        const data = (await response.json()) as { summary?: string };
+        if (typeof data.summary === "string" && data.summary.trim().length > 0) {
+          return data.summary.trim();
+        }
+      } catch (err) {
+        console.error("❌ Error llamando al endpoint de resumen:", err);
+      }
+
+      return cleaned.join(" | ");
+    },
+    [resolveBackendHttpBaseUrl]
+  );
+
+  // Suscripción en tiempo real al nodo currentUser.
+  // Si hay photo, se muestra en el panel izquierdo; si currentUser es null, se oculta.
+  useEffect(() => {
+    const unsubscribe = subscribe<CurrentUserNode>("currentUser", (data) => {
+      const currentUserId =
+        data && typeof data === "object"
+          ? (typeof data.userId === "string" && data.userId.trim().length > 0
+              ? data.userId.trim()
+              : typeof data.user_id === "string" && data.user_id.trim().length > 0
+              ? data.user_id.trim()
+              : null)
+          : null;
+      currentUserFirebaseIdRef.current = currentUserId;
+
+      if (
+        data &&
+        typeof data === "object" &&
+        typeof data.photo === "string" &&
+        data.photo.trim().length > 0
+      ) {
+        setResolvedPhoto(data.photo);
+        return;
+      }
+
+      setResolvedPhoto(null);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [subscribe]);
 
   // Monitorear el estado del audio para actualizar isSpeaking
   useEffect(() => {
@@ -220,13 +320,6 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
           setResolvedCaricatures(cleaned);
         } else {
           setResolvedCaricatures([]);
-        }
-        
-        if (typeof data.photo === "string" && data.photo.trim().length > 0) {
-          console.log("📸 Foto del usuario recibida en frontend");
-          setResolvedPhoto(data.photo);
-        } else {
-          setResolvedPhoto(null);
         }
       });
 
@@ -492,23 +585,44 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
     // Detener grabación
     stopRecording();
 
+    // Siempre resetear currentUser al detener conversación.
+    void write("currentUser", "null").catch((err) => {
+      console.error("❌ Error reseteando currentUser en Firebase:", err);
+    });
+
     // Limpiar timers
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
 
-    // Guardar la transcripción en la base de datos usando el ID del usuario activo
-    if (activeUserId) {
+    // Guardar SOLO resumen de los mensajes del usuario, exclusivamente
+    // cuando exista currentUser.userId.
+    const targetUserId = currentUserFirebaseIdRef.current;
+    const userOnlyMessages = transcription
+      .filter((msg) => msg.role === "user")
+      .map((msg) => msg.content);
+
+    if (targetUserId) {
       const timestamp = Date.now();
-      write(`users/${activeUserId}/transcriptions/${timestamp}`, transcription);
-      console.log(`Transcripción guardada en users/${activeUserId}/transcriptions/${timestamp}`);
-      
-      // Limpiar el ID del usuario activo después de guardar
-      setActiveUserId(null);
+      void (async () => {
+        const summary = await summarizeUserMessages(userOnlyMessages);
+        await write(`users/${targetUserId}/transcriptions/${timestamp}`, {
+          summary,
+          createdAt: new Date().toISOString(),
+          source: "user_only_summary",
+          userMessageCount: userOnlyMessages.filter((m) => m.trim().length > 0).length,
+        });
+        console.log(`Resumen guardado en users/${targetUserId}/transcriptions/${timestamp}`);
+      })().catch((err) => {
+        console.error("❌ Error guardando resumen de transcripción:", err);
+      });
     } else {
-      console.warn("⚠️ No hay ID de usuario activo, no se guardará la transcripción");
+      console.warn("⚠️ currentUser.userId no disponible, no se guardará la transcripción");
     }
+
+    // Limpiar el ID del usuario activo después de guardar/encolar guardado
+    setActiveUserId(null);
 
     // Resetear estados
     setIsRecording(false);
@@ -518,7 +632,7 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
     isUserSpeakingRef.current = false;
     setResolvedCaricatures([]);
     setTranscription([]);
-  }, [disconnect, stopRecording, stopAllAudio, send, wsIsConnected, write, activeUserId]);
+  }, [disconnect, stopRecording, stopAllAudio, send, wsIsConnected, write, summarizeUserMessages]);
 
   const toggleConversation = useCallback((transcription: Message[]) => {
     if (isRecording) {

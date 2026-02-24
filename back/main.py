@@ -292,6 +292,51 @@ def write_robot_action_to_realtime_db(user_data: dict[str, Any]) -> bool:
         return False
 
 
+def write_current_user_to_realtime_db(user_data: dict[str, Any]) -> bool:
+    """
+    Escribe los datos del usuario resuelto en el nodo `currentUser`.
+    """
+    if not FIREBASE_DATABASE_URL:
+        print("❌ FIREBASE_DATABASE_URL no configurado para currentUser.")
+        return False
+
+    current_user_payload = dict(user_data)
+
+    # Normalizar userId para consumo del frontend.
+    normalized_user_id = str(
+        user_data.get("userId")
+        or user_data.get("user_id")
+        or user_data.get("id")
+        or ""
+    ).strip()
+    if normalized_user_id:
+        current_user_payload["userId"] = normalized_user_id
+
+    if firebase_app is not None:
+        try:
+            current_user_ref = db.reference("currentUser", app=firebase_app)
+            current_user_ref.set(current_user_payload)
+            return True
+        except Exception as err:
+            print(f"⚠️ Error escribiendo currentUser con Firebase Admin: {err}")
+
+    try:
+        url = f"{FIREBASE_DATABASE_URL.rstrip('/')}/currentUser.json"
+        payload = json.dumps(current_user_payload).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="PUT",
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            status = getattr(response, "status", 200)
+            return 200 <= status < 300
+    except Exception as err:
+        print(f"❌ Error escribiendo currentUser por REST: {err}")
+        return False
+
+
 def extract_base64_payload(image_data: str) -> str:
     """
     Admite data URL o base64 directo y devuelve solo el payload base64.
@@ -677,6 +722,160 @@ class CaricatureGenerationRequest(BaseModel):
     photoBase64: str
 
 
+class TranscriptionSummaryRequest(BaseModel):
+    messages: list[str]
+
+
+def build_user_summary_fallback(messages: list[str]) -> str:
+    """
+    Fallback local para generar un resumen breve y legible del usuario
+    cuando la llamada al modelo no devuelve texto utilizable.
+    """
+    cleaned = [m.strip() for m in messages if isinstance(m, str) and m.strip()]
+    if not cleaned:
+        return ""
+
+    combined = " ".join(cleaned)
+    normalized = normalize_text(combined)
+
+    name = ""
+    age = ""
+    job = ""
+    company = ""
+    interest = ""
+
+    # Nombre (ej: "me llamo X", "soy X")
+    name_match = re.search(r"\b(me llamo|mi nombre es)\s+([a-záéíóúñüA-ZÁÉÍÓÚÑÜ][^,.!?]{1,40})", combined, flags=re.IGNORECASE)
+    if name_match:
+        name = name_match.group(2).strip()
+
+    # Edad (ej: "tengo 53 años")
+    age_match = re.search(r"\btengo\s+(\d{1,3})\s+anos?\b", normalized)
+    if age_match:
+        age = age_match.group(1)
+
+    # Rol/puesto
+    job_match = re.search(
+        r"\b(soy|trabajo como)\s+(desarrollador(?:a)?(?:\s+[a-zA-Z\-]+)?|ingenier[oa]|frontend|backend|full[-\s]?stack|product manager|qa)\b",
+        normalized,
+    )
+    if job_match:
+        job = job_match.group(2).strip()
+
+    # Empresa
+    company_match = re.search(r"\btrabajo en\s+([a-zA-Z0-9ÁÉÍÓÚÑáéíóúñüÜ .,&\-]{2,50})", combined, flags=re.IGNORECASE)
+    if company_match:
+        company = company_match.group(1).strip(" .")
+
+    # Interés genérico (último mensaje no vacío)
+    interest = cleaned[-1]
+
+    parts: list[str] = []
+    if name:
+        parts.append(f"El usuario se llama {name}.")
+    else:
+        parts.append("El usuario mantiene una conversación sobre su perfil.")
+
+    if age:
+        parts.append(f"Tiene {age} años.")
+    if job:
+        parts.append(f"Su rol es {job}.")
+    if company:
+        parts.append(f"Trabaja en {company}.")
+    if interest:
+        parts.append(f"Como interés principal comenta: {interest}.")
+
+    return " ".join(parts[:4]).strip()
+
+
+async def summarize_user_messages_with_realtime(messages: list[str]) -> str:
+    """
+    Resume solo los mensajes del usuario usando gpt-realtime en modo texto.
+    """
+    cleaned_messages = [m.strip() for m in messages if isinstance(m, str) and m.strip()]
+    if not cleaned_messages:
+        return ""
+    if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_API_KEY:
+        return build_user_summary_fallback(cleaned_messages)
+
+    endpoint_base = AZURE_OPENAI_ENDPOINT.rstrip("/")
+    if endpoint_base.startswith("https://"):
+        endpoint_base = endpoint_base.replace("https://", "wss://")
+    elif endpoint_base.startswith("http://"):
+        endpoint_base = endpoint_base.replace("http://", "ws://")
+
+    realtime_url = (
+        f"{endpoint_base}/openai/realtime"
+        f"?deployment={MODEL_NAME}&api-version={AZURE_OPENAI_API_VERSION}"
+    )
+    headers = {"api-key": AZURE_OPENAI_API_KEY}
+
+    joined_user_messages = "\n".join(f"- {msg}" for msg in cleaned_messages)
+    summarization_prompt = (
+        "Genera un resumen breve en español (1-3 frases) SOLO con información aportada por el usuario. "
+        "No listes frases textuales ni uses viñetas. "
+        "Prioriza: nombre, edad, trabajo/empresa e intereses. "
+        "Si falta algún dato, simplemente omítelo sin inventar.\n\n"
+        "Mensajes del usuario:\n"
+        f"{joined_user_messages}"
+    )
+
+    collected_text_parts: list[str] = []
+    try:
+        async with websockets.connect(realtime_url, additional_headers=headers) as realtime_ws:
+            session_init = {
+                "type": "session.update",
+                "session": {
+                    "modalities": ["text"],
+                    "instructions": "Eres un asistente que resume conversaciones con precisión.",
+                },
+            }
+            await realtime_ws.send(json.dumps(session_init))
+
+            await realtime_ws.send(
+                json.dumps(
+                    {
+                        "type": "conversation.item.create",
+                        "item": {
+                            "type": "message",
+                            "role": "user",
+                            "content": [{"type": "input_text", "text": summarization_prompt}],
+                        },
+                    }
+                )
+            )
+            await realtime_ws.send(json.dumps({"type": "response.create"}))
+
+            # Recibir texto hasta completar la respuesta
+            for _ in range(200):
+                raw = await asyncio.wait_for(realtime_ws.recv(), timeout=20)
+                if not isinstance(raw, str):
+                    continue
+                event = json.loads(raw)
+                event_type = event.get("type")
+                if event_type in ("conversation.item.output_text.delta", "response.output_text.delta"):
+                    delta = event.get("delta")
+                    if isinstance(delta, str):
+                        collected_text_parts.append(delta)
+                elif event_type in ("conversation.item.output_text.done", "response.output_text.done"):
+                    text = event.get("text")
+                    if isinstance(text, str) and text.strip():
+                        if not "".join(collected_text_parts).strip():
+                            collected_text_parts.append(text)
+                elif event_type == "response.done":
+                    break
+    except Exception as err:
+        print(f"⚠️ Error resumiendo con gpt-realtime: {err}")
+
+    summary = "".join(collected_text_parts).strip()
+    if summary:
+        # Si el modelo devolvió algo con formato de "lista pegada", usar fallback limpio.
+        if summary.count("|") >= 2 and len(summary) > 120:
+            return build_user_summary_fallback(cleaned_messages)
+        return summary
+    return build_user_summary_fallback(cleaned_messages)
+
+
 @app.get("/")
 async def root():
     """Endpoint de salud"""
@@ -775,6 +974,18 @@ async def generate_caricature(payload: CaricatureGenerationRequest):
     except Exception as err:
         print(f"❌ Error en generación/guardado de caricatura: {err}")
         raise HTTPException(status_code=500, detail=str(err))
+
+
+@app.post("/transcriptions/summarize")
+async def summarize_transcription(payload: TranscriptionSummaryRequest):
+    """
+    Recibe mensajes del usuario y devuelve un resumen generado con gpt-realtime.
+    """
+    summary = await summarize_user_messages_with_realtime(payload.messages)
+    return {
+        "ok": True,
+        "summary": summary,
+    }
 
 
 @app.websocket("/ws")
@@ -898,6 +1109,12 @@ async def handle_realtime_connection(realtime_ws, websocket):
         if not user_data:
             print(f"⚠️ Número detectado pero sin datos en Firebase: {order_number}")
             return
+
+        current_user_ok = await asyncio.to_thread(write_current_user_to_realtime_db, user_data)
+        if current_user_ok:
+            print("✅ currentUser actualizado en Firebase.")
+        else:
+            print("⚠️ No se pudo actualizar currentUser en Firebase.")
 
         robot_action_ok = await asyncio.to_thread(write_robot_action_to_realtime_db, user_data)
         if robot_action_ok:
