@@ -813,10 +813,20 @@ async def summarize_user_messages_with_realtime(messages: list[str]) -> str:
 
     joined_user_messages = "\n".join(f"- {msg}" for msg in cleaned_messages)
     summarization_prompt = (
-        "Genera un resumen breve en español (1-3 frases) SOLO con información aportada por el usuario. "
-        "No listes frases textuales ni uses viñetas. "
-        "Prioriza: nombre, edad, trabajo/empresa e intereses. "
-        "Si falta algún dato, simplemente omítelo sin inventar.\n\n"
+        "Genera un resumen de perfil de cliente en español, más detallado y útil para marketing, "
+        "usando SOLO lo dicho por el usuario. No inventes información.\n\n"
+        "Formato de salida:\n"
+        "- Un único párrafo de 4 a 7 frases.\n"
+        "- Redacción natural en tercera persona.\n"
+        "- Sin viñetas, sin listas y sin citar literalmente frases del usuario.\n\n"
+        "Incluye SIEMPRE que esté disponible:\n"
+        "1) Nombre.\n"
+        "2) Edad.\n"
+        "3) Empresa/sector y rol profesional.\n"
+        "4) Intereses, inquietudes o motivaciones expresadas.\n"
+        "5) Necesidades, problemas u objeciones detectadas.\n"
+        "6) Intención o próximo paso sugerido para seguimiento comercial.\n\n"
+        "Si algún dato no aparece en los mensajes, omítelo sin rellenar huecos.\n\n"
         "Mensajes del usuario:\n"
         f"{joined_user_messages}"
     )
