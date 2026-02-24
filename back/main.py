@@ -570,20 +570,32 @@ def build_welcome_prompt() -> str:
     )
 
 
-def build_conversation_prompt(user_name: str = None) -> str:
-    """Prompt para la conversación después de elegir regalo o caricatura."""
+def build_conversation_prompt(user_name: str = None, has_caricatures: bool = False) -> str:
+    """Prompt para conversación posterior, adaptado al tipo de acción."""
     name_part = f"El usuario se llama {user_name}. Dirígete a él por su nombre.\n\n" if user_name else ""
-    return (
-        REGLAS_CONVERSACION + "\n"
-        "=== SITUACIÓN ACTUAL ===\n\n"
-        + name_part +
-        "El usuario ya ha elegido su opción (regalo o caricatura) y el proceso está en marcha.\n"
-        "Tu tarea ahora es mantener una conversación amena mientras espera.\n\n"
-        "NAVEGACIÓN:\n"
-        "- Empieza preguntando por su empresa o su puesto\n"
-        "- Navega naturalmente entre los 5 temas permitidos\n"
-        "- Busca conexiones entre las respuestas para fluir en la conversación\n"
-    )
+    if has_caricatures:
+        situation_part = (
+            "El usuario ya ha elegido su opción (regalo o caricatura) y el proceso está en marcha.\n"
+            "Tu tarea ahora es mantener una conversación amena mientras espera.\n\n"
+            "NAVEGACIÓN:\n"
+            "- Empieza preguntando por su empresa o su puesto\n"
+            "- Navega naturalmente entre los 5 temas permitidos\n"
+            "- Busca conexiones entre las respuestas para fluir en la conversación\n"
+        )
+    else:
+        situation_part = (
+            "El usuario ha elegido un regalo y no tiene caricaturas asociadas.\n"
+            "Debes hablar solo del flujo de regalo. No menciones caricaturas.\n"
+            "Puedes responder en tono natural con algo como: "
+            "'Hola <nombre>, veo que has escogido un regalo, marchando...'.\n"
+            "Tu tarea ahora es mantener una conversación amena mientras espera su regalo.\n\n"
+            "NAVEGACIÓN:\n"
+            "- Empieza preguntando por su empresa o su puesto\n"
+            "- Navega naturalmente entre los temas permitidos\n"
+            "- Mantén un tono breve, amable y orientado a la espera del regalo\n"
+        )
+
+    return REGLAS_CONVERSACION + "\n" + "=== SITUACIÓN ACTUAL ===\n\n" + name_part + situation_part
 
 
 def send_user_data_to_external_api_sync(order_number: str, user_data: dict[str, Any]) -> bool:
@@ -841,26 +853,9 @@ async def summarize_user_messages_with_realtime(messages: list[dict[str, str]]) 
         f"- {m['role'].upper()}: {m['content']}" for m in normalized_messages
     )
     summarization_prompt = (
-        "Genera un resumen de perfil de cliente en español, más detallado y útil para marketing, "
-        "usando SOLO lo dicho por el usuario. No inventes información.\n\n"
-        "Formato de salida:\n"
-        "- Un único párrafo, redacción natural en tercera persona.\n"
-        "- sin límite de frases, con buen nivel de detalle.\n"
-        "- Sin viñetas, sin listas y sin citar literalmente frases del usuario.\n"
-        "- NO uses puntos suspensivos ('...').\n\n"
-        "Incluye SIEMPRE que se haya comentado en la conversación:\n"
-        "1) Nombre.\n"
-        "2) Edad.\n"
-        "3) Empresa/sector donde trabaja y rol profesional.\n"
-        "4) Intereses, inquietudes o motivaciones expresadas.\n"
-        "5) Necesidades, problemas u objeciones detectadas.\n"
-        "6) Intención o próximo paso sugerido para seguimiento comercial.\n\n"
-        "Si algún dato no aparece en los mensajes, indícalo de forma explícita como "
-        "'dato no mencionado por el usuario', sin inventar.\n\n"
+        "Resume esta conversación:"
         "Conversación completa (contexto):\n"
         f"{full_conversation}\n\n"
-        "IMPORTANTE: Aunque tienes toda la conversación para contexto, resume únicamente "
-        "la información aportada por el usuario."
     )
 
     collected_text_parts: list[str] = []
@@ -1183,6 +1178,7 @@ async def handle_realtime_connection(realtime_ws, websocket):
         )
         print(f"Nombre resuelto desde Firebase: {resolved_name or '(vacío)'}")
         resolved_caricatures = user_data.get("caricatures")
+        has_caricatures = isinstance(resolved_caricatures, list) and len(resolved_caricatures) > 0
         resolved_photo = user_data.get("photo")
         if isinstance(resolved_caricatures, list):
             print(f"Caricaturas detectadas para usuario: {len(resolved_caricatures)}")
@@ -1210,7 +1206,7 @@ async def handle_realtime_connection(realtime_ws, websocket):
 
         # Refuerzo fuerte: fijar contexto personalizado en la sesión realtime.
         user_name = resolved_name or None
-        session_instructions = build_conversation_prompt(user_name)
+        session_instructions = build_conversation_prompt(user_name, has_caricatures)
         
         session_update = {
             "type": "session.update",
@@ -1234,6 +1230,7 @@ async def handle_realtime_connection(realtime_ws, websocket):
         user_data = session_ctx.get("locked_user_data") or {}
         user_name = None
         
+        has_caricatures = False
         if session_ctx["is_user_locked"] and isinstance(user_data, dict):
             user_name = str(
                 user_data.get("fullName")
@@ -1241,10 +1238,12 @@ async def handle_realtime_connection(realtime_ws, websocket):
                 or user_data.get("nombre")
                 or ""
             ).strip() or None
+            resolved_caricatures = user_data.get("caricatures")
+            has_caricatures = isinstance(resolved_caricatures, list) and len(resolved_caricatures) > 0
 
         # Usar prompt de conversación si ya tenemos usuario, si no el de bienvenida
         if session_ctx["is_user_locked"]:
-            personalization = build_conversation_prompt(user_name)
+            personalization = build_conversation_prompt(user_name, has_caricatures)
         else:
             personalization = build_welcome_prompt()
 
