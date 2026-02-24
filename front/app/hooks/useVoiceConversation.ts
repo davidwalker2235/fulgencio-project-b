@@ -593,7 +593,7 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
     stopRecording();
 
     // Siempre resetear currentUser al detener conversación.
-    void write("currentUser", null).catch((err) => {
+    void write("currentUser", "null").catch((err) => {
       console.error("❌ Error reseteando currentUser en Firebase:", err);
     });
 

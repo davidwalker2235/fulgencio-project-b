@@ -171,6 +171,15 @@ function PhotoCaptureContent() {
       className="min-h-screen w-full flex flex-col"
       style={{ backgroundColor: "#033778" }}
     >
+      {isLoading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/70">
+          <div className="w-14 h-14 border-4 border-white border-t-transparent rounded-full animate-spin" />
+          <p className="mt-5 text-white text-base sm:text-lg font-semibold text-center px-4">
+            Processing photo, please wait...
+          </p>
+        </div>
+      )}
+
       {/* Header with Logo */}
       <div className="w-full flex justify-center pt-6 pb-4 px-4">
         <div className="relative w-full max-w-[200px] sm:max-w-[240px] aspect-[3/1]">
@@ -248,7 +257,7 @@ function PhotoCaptureContent() {
                 disabled={isLoading}
                 className="flex-1 py-3 px-6 rounded-lg font-semibold text-base bg-green-500 text-white hover:bg-green-600 active:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? "Sending..." : "Send"}
+                {isLoading ? "Generating caricature..." : "Send"}
               </button>
               <button
                 onClick={handleRepeat}

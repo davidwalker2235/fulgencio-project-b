@@ -56,15 +56,14 @@ export default function PhotoPage() {
         {/* Checkbox and Button Container */}
         <div className="flex flex-col items-center space-y-3 sm:space-y-4 w-full mt-8 sm:mt-12 pb-4">
           {/* Checkbox */}
-          <label className="flex items-center space-x-2 cursor-pointer flex-shrink-0">
+          <label className="flex items-center space-x-3 cursor-pointer flex-shrink-0">
             <input
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
-              className="w-4 h-4 rounded border-2 border-white bg-transparent checked:bg-white checked:border-white focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#033778] cursor-pointer"
-              style={{ accentColor: "white" }}
+              className="w-6 h-6 rounded-md border-2 border-white bg-transparent checked:bg-lime-400 checked:border-lime-300 focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#033778] cursor-pointer"
             />
-            <span className="text-white text-xs sm:text-sm">
+            <span className="text-white text-sm sm:text-base font-medium">
               Agree the <a href="https://www.betterask.erni/es-es/privacy-statement/" target="_blank" rel="noopener noreferrer" className="underline text-white hover:text-gray-200 transition-colors">terms and conditions</a>
             </span>
           </label>
