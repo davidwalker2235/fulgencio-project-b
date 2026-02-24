@@ -8,6 +8,7 @@ import sys
 import unicodedata
 import urllib.error
 import urllib.request
+from time import time
 from typing import Any, Optional
 
 import requests
@@ -218,6 +219,76 @@ def update_user_fields_in_realtime_db(order_number: str, fields: dict[str, Any])
             return 200 <= status < 300
     except Exception as err:
         print(f"❌ Error actualizando Firebase REST para {order_number}: {err}")
+        return False
+
+
+def write_robot_action_to_realtime_db(user_data: dict[str, Any]) -> bool:
+    """
+    Escribe la acción del robot en el nodo `robot_action` en Firebase.
+    - Si existe `caricatures` en user_data, envía `draw_caricature`.
+    - Si no existe, envía `give_gift_bag`.
+    """
+    if not FIREBASE_DATABASE_URL:
+        print("❌ FIREBASE_DATABASE_URL no configurado para robot_action.")
+        return False
+
+    has_caricatures_node = "caricatures" in user_data
+    timestamp = int(time())
+
+    if has_caricatures_node:
+        caricatures = user_data.get("caricatures")
+        caricature_image = ""
+        if isinstance(caricatures, list) and len(caricatures) > 0:
+            first = caricatures[0]
+            if isinstance(first, str):
+                caricature_image = first
+
+        action_payload = {
+            "type": "draw_caricature",
+            "timestamp": timestamp,
+            "userId": str(
+                user_data.get("userId")
+                or user_data.get("user_id")
+                or user_data.get("id")
+                or ""
+            ).strip(),
+            "fullName": str(
+                user_data.get("full_name")
+                or user_data.get("fullName")
+                or user_data.get("name")
+                or user_data.get("nombre")
+                or ""
+            ).strip(),
+            "caricatureImage": caricature_image,
+        }
+    else:
+        action_payload = {
+            "type": "give_gift_bag",
+            "timestamp": timestamp,
+        }
+
+    if firebase_app is not None:
+        try:
+            robot_action_ref = db.reference("robot_action", app=firebase_app)
+            robot_action_ref.set(action_payload)
+            return True
+        except Exception as err:
+            print(f"⚠️ Error escribiendo robot_action con Firebase Admin: {err}")
+
+    try:
+        url = f"{FIREBASE_DATABASE_URL.rstrip('/')}/robot_action.json"
+        payload = json.dumps(action_payload).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="PUT",
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            status = getattr(response, "status", 200)
+            return 200 <= status < 300
+    except Exception as err:
+        print(f"❌ Error escribiendo robot_action por REST: {err}")
         return False
 
 
@@ -827,6 +898,12 @@ async def handle_realtime_connection(realtime_ws, websocket):
         if not user_data:
             print(f"⚠️ Número detectado pero sin datos en Firebase: {order_number}")
             return
+
+        robot_action_ok = await asyncio.to_thread(write_robot_action_to_realtime_db, user_data)
+        if robot_action_ok:
+            print("✅ robot_action actualizado en Firebase.")
+        else:
+            print("⚠️ No se pudo actualizar robot_action en Firebase.")
 
         session_ctx["is_user_locked"] = True
         session_ctx["locked_order_number"] = order_number
