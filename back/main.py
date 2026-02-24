@@ -292,7 +292,7 @@ def write_robot_action_to_realtime_db(user_data: dict[str, Any]) -> bool:
         return False
 
 
-def write_current_user_to_realtime_db(user_data: dict[str, Any]) -> bool:
+def write_current_user_to_realtime_db(user_data: dict[str, Any], order_number: str) -> bool:
     """
     Escribe los datos del usuario resuelto en el nodo `currentUser`.
     """
@@ -307,6 +307,7 @@ def write_current_user_to_realtime_db(user_data: dict[str, Any]) -> bool:
         user_data.get("userId")
         or user_data.get("user_id")
         or user_data.get("id")
+        or order_number
         or ""
     ).strip()
     if normalized_user_id:
@@ -1110,7 +1111,11 @@ async def handle_realtime_connection(realtime_ws, websocket):
             print(f"⚠️ Número detectado pero sin datos en Firebase: {order_number}")
             return
 
-        current_user_ok = await asyncio.to_thread(write_current_user_to_realtime_db, user_data)
+        current_user_ok = await asyncio.to_thread(
+            write_current_user_to_realtime_db,
+            user_data,
+            order_number,
+        )
         if current_user_ok:
             print("✅ currentUser actualizado en Firebase.")
         else:

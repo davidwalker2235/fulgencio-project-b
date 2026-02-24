@@ -137,8 +137,12 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
         data && typeof data === "object"
           ? (typeof data.userId === "string" && data.userId.trim().length > 0
               ? data.userId.trim()
+              : typeof data.userId === "number"
+              ? String(data.userId)
               : typeof data.user_id === "string" && data.user_id.trim().length > 0
               ? data.user_id.trim()
+              : typeof data.user_id === "number"
+              ? String(data.user_id)
               : null)
           : null;
       currentUserFirebaseIdRef.current = currentUserId;
@@ -579,6 +583,9 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
       });
     }
 
+    // Capturar el userId ANTES de resetear currentUser.
+    const targetUserId = currentUserFirebaseIdRef.current;
+
     // Cerrar WebSocket
     disconnect();
 
@@ -586,7 +593,7 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
     stopRecording();
 
     // Siempre resetear currentUser al detener conversación.
-    void write("currentUser", "null").catch((err) => {
+    void write("currentUser", null).catch((err) => {
       console.error("❌ Error reseteando currentUser en Firebase:", err);
     });
 
@@ -598,7 +605,6 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
 
     // Guardar SOLO resumen de los mensajes del usuario, exclusivamente
     // cuando exista currentUser.userId.
-    const targetUserId = currentUserFirebaseIdRef.current;
     const userOnlyMessages = transcription
       .filter((msg) => msg.role === "user")
       .map((msg) => msg.content);
