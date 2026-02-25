@@ -13,6 +13,7 @@ export const AUDIO_CONFIG = {
   sampleRate: 24000,
   echoCancellation: true,
   noiseSuppression: true,
+  autoGainControl: true,
 } as const;
 
 export const AUDIO_PROCESSING = {

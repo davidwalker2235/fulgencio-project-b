@@ -19,9 +19,12 @@ export function useAudioRecording(): UseAudioRecordingReturn {
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const silentGainRef = useRef<GainNode | null>(null);
   const isRecordingRef = useRef<boolean>(false);
   const audioLevelRef = useRef<number>(0);
   const isUserSpeakingRef = useRef<boolean>(false);
+  const speakingFramesRef = useRef<number>(0);
+  const silenceFramesRef = useRef<number>(0);
 
   const startRecording = useCallback(
     async (
@@ -50,7 +53,10 @@ export function useAudioRecording(): UseAudioRecordingReturn {
           1,
           1
         );
+        const silentGain = audioContext.createGain();
+        silentGain.gain.value = 0;
         processorRef.current = processor;
+        silentGainRef.current = silentGain;
 
         processor.onaudioprocess = (e) => {
           if (!isRecordingRef.current) return;
@@ -61,10 +67,29 @@ export function useAudioRecording(): UseAudioRecordingReturn {
           const averageLevel = calculateAudioLevel(inputData);
           audioLevelRef.current = averageLevel;
 
-          // Detectar si el usuario está hablando
+          // Detección robusta para evitar activación por ruido ambiental.
+          // - Umbral de entrada más alto
+          // - Umbral de salida más bajo (histeresis)
+          // - Requiere varios frames consecutivos
           const wasUserSpeaking = isUserSpeakingRef.current;
-          isUserSpeakingRef.current =
-            averageLevel > VOICE_DETECTION.speakingThreshold;
+          const speakingOnThreshold = VOICE_DETECTION.speakingThreshold * 3; // 0.015 por defecto
+          const speakingOffThreshold = VOICE_DETECTION.speakingThreshold * 1.4;
+          const speakingFramesNeeded = 3;
+          const silenceFramesNeeded = 6;
+
+          if (averageLevel >= speakingOnThreshold) {
+            speakingFramesRef.current += 1;
+            silenceFramesRef.current = 0;
+          } else if (averageLevel <= speakingOffThreshold) {
+            silenceFramesRef.current += 1;
+            speakingFramesRef.current = 0;
+          }
+
+          if (!wasUserSpeaking && speakingFramesRef.current >= speakingFramesNeeded) {
+            isUserSpeakingRef.current = true;
+          } else if (wasUserSpeaking && silenceFramesRef.current >= silenceFramesNeeded) {
+            isUserSpeakingRef.current = false;
+          }
 
           // Notificar cambio en el estado de habla
           if (onUserSpeakingChange && wasUserSpeaking !== isUserSpeakingRef.current) {
@@ -82,7 +107,10 @@ export function useAudioRecording(): UseAudioRecordingReturn {
 
         // Conectar el procesador de audio
         source.connect(processor);
-        processor.connect(audioContext.destination);
+        // Mantener el nodo activo sin sacar el micro por altavoz.
+        // Esto evita que el front "se escuche a sí mismo" en la mayoría de casos.
+        processor.connect(silentGain);
+        silentGain.connect(audioContext.destination);
 
         isRecordingRef.current = true;
 
@@ -103,6 +131,11 @@ export function useAudioRecording(): UseAudioRecordingReturn {
       processorRef.current = null;
     }
 
+    if (silentGainRef.current) {
+      silentGainRef.current.disconnect();
+      silentGainRef.current = null;
+    }
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -115,6 +148,8 @@ export function useAudioRecording(): UseAudioRecordingReturn {
 
     audioLevelRef.current = 0;
     isUserSpeakingRef.current = false;
+    speakingFramesRef.current = 0;
+    silenceFramesRef.current = 0;
 
     console.log("Grabación de audio detenida");
   }, []);
