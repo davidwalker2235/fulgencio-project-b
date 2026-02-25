@@ -29,7 +29,7 @@ export const VOICE_DETECTION = {
 export const SESSION_CONFIG = {
   modalities: ["text", "audio"],
   instructions: VOICE_ASSISTANT_INSTRUCTIONS,
-  voice: "shimmer",
+  voice: "cedar",
   input_audio_format: "pcm16",
   output_audio_format: "pcm16",
   input_audio_transcription: {

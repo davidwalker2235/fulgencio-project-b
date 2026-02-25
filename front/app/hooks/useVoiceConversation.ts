@@ -208,41 +208,27 @@ export function useVoiceConversation(): UseVoiceConversationReturn {
 
   const handleAudioChunk = useCallback(
     (audioData: ArrayBuffer) => {
+      // Modo half-duplex: mientras la IA está hablando, no enviamos audio del micro.
+      if (hasActiveAudio()) return;
+
       if (wsIsConnected() && audioIsRecording()) {
         send(audioData);
       }
     },
-    [send, wsIsConnected, audioIsRecording]
+    [send, wsIsConnected, audioIsRecording, hasActiveAudio]
   );
 
   const handleUserSpeaking = useCallback(
     (isSpeaking: boolean, wasSpeaking: boolean) => {
       const audioIsActive = hasActiveAudio();
 
-      // Si el usuario empieza a hablar mientras la IA está hablando, cancelar INMEDIATAMENTE
-      if (isSpeaking && !wasSpeaking && audioIsActive) {
-        console.log("🚨 INTERRUPCIÓN DETECTADA - Usuario hablando mientras IA habla");
-        isInterruptedRef.current = true;
-        stopAllAudio();
-
-        // Si hay una respuesta activa, cancelarla en el servidor
-        if (currentResponseIdRef.current) {
-          try {
-            send({
-              type: "response.cancel",
-              response_id: currentResponseIdRef.current,
-            });
-            console.log("✅ Comando de cancelación enviado al servidor");
-          } catch (err) {
-            console.error("❌ Error enviando cancelación:", err);
-          }
-        }
-
-        // Limpiar timer de silencio si existe
+      // Modo half-duplex: desactivar interrupción por VAD mientras la IA habla.
+      if (audioIsActive) {
         if (silenceTimerRef.current) {
           clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = null;
         }
+        return;
       }
 
       // Si el usuario deja de hablar, quitar la marca de interrupción

@@ -1144,7 +1144,7 @@ async def handle_realtime_connection(realtime_ws, websocket):
         "session": {
             "modalities": ["text", "audio"],
             "instructions": build_welcome_prompt(),
-            "voice": "alloy",
+            "voice": "cedar",
             "input_audio_format": "pcm16",
             "output_audio_format": "pcm16",
             "input_audio_transcription": {
